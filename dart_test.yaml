@@ -1,0 +1,3 @@
+tags:
+  live:
+    skip: "Hits the live server; run with: flutter test --tags live --run-skipped"
