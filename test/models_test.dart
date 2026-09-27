@@ -1,4 +1,5 @@
 import 'package:easybuy/core/money.dart';
+import 'package:easybuy/core/push.dart';
 import 'package:easybuy/data/models.dart';
 import 'package:easybuy/ui/app.dart' show pushRoute;
 import 'package:flutter_test/flutter_test.dart';
@@ -113,5 +114,9 @@ void main() {
     expect(pushRoute({'type': 'chat'}), '/chat');
     expect(pushRoute({'type': 'order'}), isNull);
     expect(pushRoute({}), isNull);
+  });
+
+  test('without Firebase settings the build simply has no push', () {
+    expect(PushService.options(), isNull);
   });
 }

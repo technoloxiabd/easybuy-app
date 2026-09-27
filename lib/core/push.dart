@@ -9,9 +9,8 @@ import '../data/api.dart';
 
 /// Push notifications, when Firebase is configured for this build.
 ///
-/// Firebase reads google-services.json (Android) / GoogleService-Info.plist
-/// (iOS) from the Firebase console. Without them [init] fails quietly and
-/// the app simply has no push -- everything else works.
+/// Configured from build-time defines (see [options]); a build without them
+/// simply has no push -- everything else works.
 class PushService {
   PushService._();
   static final instance = PushService._();
@@ -27,9 +26,34 @@ class PushService {
   /// Messages that arrive while the app is open (no system banner then).
   Stream<RemoteMessage> get foreground => _foreground.stream;
 
+  /// The Firebase app settings, passed at build time (Codemagic env vars ->
+  /// --dart-define). They are identifiers, not secrets -- every copy of the
+  /// app carries them -- but keeping them out of git keeps one repo usable
+  /// against a test and a live Firebase project.
+  static FirebaseOptions? options() {
+    const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+    const senderId = String.fromEnvironment('FIREBASE_SENDER_ID');
+    final ios = !kIsWeb && Platform.isIOS;
+    final apiKey = ios ? const String.fromEnvironment('FIREBASE_IOS_API_KEY') : const String.fromEnvironment('FIREBASE_ANDROID_API_KEY');
+    final appId = ios ? const String.fromEnvironment('FIREBASE_IOS_APP_ID') : const String.fromEnvironment('FIREBASE_ANDROID_APP_ID');
+    if (projectId.isEmpty || senderId.isEmpty || apiKey.isEmpty || appId.isEmpty) return null;
+    return FirebaseOptions(
+      apiKey: apiKey,
+      appId: appId,
+      messagingSenderId: senderId,
+      projectId: projectId,
+      iosBundleId: ios ? 'bd.com.easybuy.app' : null,
+    );
+  }
+
   Future<void> init() async {
+    final opts = options();
+    if (opts == null) {
+      debugPrint('Push disabled: no Firebase settings in this build');
+      return;
+    }
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(options: opts);
       _ready = true;
     } catch (e) {
       debugPrint('Push disabled: Firebase is not configured ($e)');

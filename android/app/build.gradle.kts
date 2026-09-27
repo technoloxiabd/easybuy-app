@@ -1,16 +1,9 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-}
-
-/*
- * Firebase (push) reads android/app/google-services.json from the Firebase
- * console. Until that file is added the app builds and runs without push,
- * rather than failing the build.
- */
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
@@ -38,11 +31,33 @@ android {
         versionName = flutter.versionName
     }
 
+    /*
+     * Release signing. On Codemagic the upload keystore is a stored
+     * reference and arrives as CM_KEYSTORE_* variables; on a developer's
+     * machine it can come from android/key.properties. Neither the keystore
+     * nor its passwords ever enter git. With neither present, a release
+     * build falls back to debug keys: installable for testing, not uploadable.
+     */
+    val keyProps = Properties().apply {
+        val f = rootProject.file("key.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    val storePath = System.getenv("CM_KEYSTORE_PATH") ?: keyProps.getProperty("storeFile")
+
+    signingConfigs {
+        if (storePath != null) {
+            create("upload") {
+                storeFile = file(storePath)
+                storePassword = System.getenv("CM_KEYSTORE_PASSWORD") ?: keyProps.getProperty("storePassword")
+                keyAlias = System.getenv("CM_KEY_ALIAS") ?: keyProps.getProperty("keyAlias")
+                keyPassword = System.getenv("CM_KEY_PASSWORD") ?: keyProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (storePath != null) signingConfigs.getByName("upload") else signingConfigs.getByName("debug")
         }
     }
 }

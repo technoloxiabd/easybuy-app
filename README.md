@@ -27,6 +27,41 @@ flutter test
 flutter test --tags live --run-skipped   # read-only calls to the live API
 ```
 
+## Codemagic (how the app is built)
+
+`codemagic.yaml` has three workflows, all started by hand from Codemagic:
+
+| Workflow | Output |
+|---|---|
+| `android-test` | a signed APK to install on Android phones for testing (e-mailed link) |
+| `android-play` | the Play Store bundle, sent to the internal testing track as a draft |
+| `ios-testflight` | the iOS build, sent to TestFlight |
+
+Every workflow runs `flutter analyze` and `flutter test` first and stops on
+any failure. The build number is Codemagic's `PROJECT_BUILD_NUMBER`; the
+version name comes from `pubspec.yaml`.
+
+One-time setup in Codemagic (nothing here goes into git):
+
+1. **Connect the repository** (a private GitHub/GitLab/Bitbucket repo holding
+   this directory).
+2. **Android upload key** — Team settings → Code signing identities →
+   Android keystores: create or upload one, reference name
+   `easybuy_upload`. Keep a copy somewhere safe: Play needs the same key for
+   every future update.
+3. **Firebase** — app Environment variables, group `firebase`:
+   `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_ANDROID_APP_ID`,
+   `FIREBASE_ANDROID_API_KEY`, `FIREBASE_IOS_APP_ID`, `FIREBASE_IOS_API_KEY`
+   (from the Firebase console's app settings). Without them push is off.
+4. **iOS** — Team settings → Integrations → App Store Connect: an API key
+   named `EasyBuy App Store Connect`; the App ID `bd.com.easybuy.app` with
+   the Push Notifications capability, and the app record created in App
+   Store Connect. Codemagic then fetches or creates the signing files.
+5. **Play** — group `google_play` with `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS`
+   (a Google Cloud service account invited to the Play Console). Play takes
+   an app's first upload only through its own console: upload the first
+   `.aab` from the `android-play` artifacts by hand.
+
 ## Building for phones (needs a Mac for iOS, or a cloud builder)
 
 ```bash
@@ -39,13 +74,12 @@ Point at another server with `--dart-define=API_BASE=https://…/api/v1`.
 
 Before a store release:
 
-1. **Signing.** Android: create an upload keystore and a `key.properties`
-   (never commit either); iOS: set the team in Xcode.
-2. **Push.** From the Firebase project: `android/app/google-services.json`
-   and `ios/Runner/GoogleService-Info.plist` (added to the Runner target in
-   Xcode), plus an APNs key uploaded to Firebase and the *Push Notifications*
-   capability enabled in Xcode. Without these files the app runs with push
-   off. The server needs the project's service-account key too (see the
-   site's docs/mobile-app.md).
+1. **Signing.** On Codemagic, as above. On a developer machine, Android can
+   read `android/key.properties` (never committed).
+2. **Push.** The Firebase settings arrive as `--dart-define`s (Codemagic
+   group `firebase`, above) — no google-services.json / plist files. iOS also
+   needs an APNs key uploaded to Firebase; the push entitlement is already in
+   `ios/Runner/Runner.entitlements`. The server needs the project's
+   service-account key too (see the site's docs/mobile-app.md).
 3. **Icon.** Generated from the site's 512 px icon; the 1024 px App Store
    icon is an upscale — replace it with a sharp 1024 px original.

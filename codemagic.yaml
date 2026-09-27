@@ -1,0 +1,118 @@
+# Codemagic builds for the EasyBuy app. Nothing secret lives here: the
+# signing keys, the App Store / Play credentials and the Firebase settings
+# are stored in Codemagic (Team settings / app environment variables) and
+# only NAMED below. See README.md "Codemagic" for the one-time setup.
+
+definitions:
+  environment: &env
+    flutter: stable
+    groups:
+      # FIREBASE_PROJECT_ID, FIREBASE_SENDER_ID, FIREBASE_ANDROID_APP_ID,
+      # FIREBASE_ANDROID_API_KEY, FIREBASE_IOS_APP_ID, FIREBASE_IOS_API_KEY.
+      # Missing = the build works, push is off.
+      - firebase
+  scripts:
+    - &checks
+      name: Analyze and test
+      script: |
+        flutter pub get
+        flutter analyze
+        flutter test
+    - &defines
+      name: Build settings
+      script: |
+        # The app version shown to support comes from pubspec.yaml.
+        VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+        DEFINES="--dart-define=APP_VERSION=$VERSION"
+        for v in FIREBASE_PROJECT_ID FIREBASE_SENDER_ID FIREBASE_ANDROID_APP_ID FIREBASE_ANDROID_API_KEY FIREBASE_IOS_APP_ID FIREBASE_IOS_API_KEY; do
+          if [ -n "${!v}" ]; then DEFINES="$DEFINES --dart-define=$v=${!v}"; fi
+        done
+        echo "DEFINES=$DEFINES" >> $CM_ENV
+  email: &email
+    email:
+      recipients:
+        - vqsolution@gmail.com
+      notify:
+        success: true
+        failure: true
+
+workflows:
+  # A signed APK to install straight onto Android phones for testing.
+  android-test:
+    name: Android — test APK
+    instance_type: linux_x2
+    max_build_duration: 45
+    environment:
+      <<: *env
+      android_signing:
+        - easybuy_upload
+    scripts:
+      - *checks
+      - *defines
+      - name: Build APK
+        script: flutter build apk --release --build-number=$PROJECT_BUILD_NUMBER $DEFINES
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
+    publishing:
+      <<: *email
+
+  # The store build, to Google Play's internal testing track (as a draft).
+  # Play accepts an app's FIRST upload only through its console: upload the
+  # .aab from this workflow's artifacts by hand once, then this publishes.
+  android-play:
+    name: Android — Play internal testing
+    instance_type: linux_x2
+    max_build_duration: 45
+    environment:
+      <<: *env
+      android_signing:
+        - easybuy_upload
+      groups:
+        - firebase
+        - google_play   # GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+    scripts:
+      - *checks
+      - *defines
+      - name: Build app bundle
+        script: flutter build appbundle --release --build-number=$PROJECT_BUILD_NUMBER $DEFINES
+    artifacts:
+      - build/app/outputs/bundle/release/app-release.aab
+    publishing:
+      <<: *email
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal
+        submit_as_draft: true
+
+  # iOS to TestFlight. Signing is automatic through the App Store Connect
+  # integration; the App ID needs the Push Notifications capability.
+  ios-testflight:
+    name: iOS — TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: EasyBuy App Store Connect
+    environment:
+      <<: *env
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: bd.com.easybuy.app
+    scripts:
+      - *checks
+      - *defines
+      - name: Use the signing profiles
+        script: xcode-project use-profiles
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-number=$PROJECT_BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist \
+            $DEFINES
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      <<: *email
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
