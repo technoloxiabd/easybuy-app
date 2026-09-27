@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -84,6 +86,11 @@ class NetImage extends StatelessWidget {
   final BoxFit fit;
   final double radius;
 
+  /// Screenshot tests only: images fetched beforehand, keyed by URL, because
+  /// the test harness has no network or disk cache.
+  @visibleForTesting
+  static Map<String, Uint8List> preloaded = {};
+
   @override
   Widget build(BuildContext context) {
     final placeholder = Container(
@@ -95,7 +102,9 @@ class NetImage extends StatelessWidget {
       borderRadius: BorderRadius.circular(radius),
       child: url == null || url!.isEmpty
           ? placeholder
-          : CachedNetworkImage(imageUrl: url!, fit: fit, placeholder: (_, _) => placeholder, errorWidget: (_, _, _) => placeholder),
+          : preloaded.containsKey(url)
+              ? Image.memory(preloaded[url]!, fit: fit)
+              : CachedNetworkImage(imageUrl: url!, fit: fit, placeholder: (_, _) => placeholder, errorWidget: (_, _, _) => placeholder),
     );
   }
 }

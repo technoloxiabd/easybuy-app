@@ -21,9 +21,12 @@ ThemeData buildTheme() {
     surface: Colors.white,
   );
 
-  return ThemeData(
-    colorScheme: scheme,
-    useMaterial3: true,
+  // Built in two steps so the button text can start from the theme's own
+  // label style: a bare TextStyle there would drop the font family.
+  final base = ThemeData(colorScheme: scheme, useMaterial3: true, fontFamilyFallback: const ['AnekBangla']);
+  final label = base.textTheme.labelLarge!.copyWith(fontWeight: FontWeight.w700, fontSize: 15, fontFamilyFallback: const ['AnekBangla']);
+
+  return base.copyWith(
     scaffoldBackgroundColor: Brand.page,
     appBarTheme: const AppBarTheme(
       backgroundColor: Brand.blue,
@@ -36,7 +39,7 @@ ThemeData buildTheme() {
         backgroundColor: Brand.orange,
         foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(48),
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+        textStyle: label,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     ),

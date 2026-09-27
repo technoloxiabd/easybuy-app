@@ -14,4 +14,16 @@ class Money {
   }
 
   static bool isPositive(String? amount) => (double.tryParse(amount ?? '') ?? 0) > 0.004;
+
+  static final _compact = NumberFormat.compact(locale: 'en');
+
+  /// "1.8M sold" rather than "1800002 sold".
+  static String count(int n) => n < 10000 ? NumberFormat('#,##0').format(n) : _compact.format(n);
+
+  /// "2 kg", "1.25 kg" -- trailing zeros off.
+  static String kg(String? value) {
+    final v = double.tryParse(value ?? '');
+    if (v == null) return '';
+    return '${v.toStringAsFixed(3).replaceFirst(RegExp(r'\.?0+$'), '')} kg';
+  }
 }

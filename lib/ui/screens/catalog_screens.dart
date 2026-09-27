@@ -366,9 +366,9 @@ class _ProductBodyState extends ConsumerState<_ProductBody> {
               const SizedBox(height: 6),
               Wrap(spacing: 8, runSpacing: 6, children: [
                 _Pill('Min ${p.minQuantity} pcs${p.minQuantityIsSupplier ? ' (supplier)' : ''}'),
-                if (p.saleCount > 0) _Pill('${p.saleCount} sold'),
+                if (p.saleCount > 0) _Pill('${Money.count(p.saleCount)} sold'),
                 if (p.isFactory) const _Pill('Factory'),
-                if (p.estimatedWeightKg != null) _Pill('≈ ${p.estimatedWeightKg} kg'),
+                if (p.estimatedWeightKg != null) _Pill('≈ ${Money.kg(p.estimatedWeightKg)}'),
               ]),
               if (p.priceTiers.length > 1) ...[
                 const SizedBox(height: 16),

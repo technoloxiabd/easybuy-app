@@ -10,6 +10,10 @@ void main() {
     expect(Money.bdt(null), '৳0');
     expect(Money.isPositive('0.00'), isFalse);
     expect(Money.isPositive('0.50'), isTrue);
+    expect(Money.count(1800002), '1.8M');
+    expect(Money.count(5600), '5,600');
+    expect(Money.kg('2.000'), '2 kg');
+    expect(Money.kg('1.250'), '1.25 kg');
   });
 
   test('a cart parses, including an unavailable line and warnings', () {

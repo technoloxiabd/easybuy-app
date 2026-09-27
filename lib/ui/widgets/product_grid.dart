@@ -134,7 +134,7 @@ class ProductTile extends StatelessWidget {
                 Text(
                   [
                     'Min ${product.minQuantity} pcs',
-                    if (product.saleCount > 0) '${product.saleCount} sold',
+                    if (product.saleCount > 0) '${Money.count(product.saleCount)} sold',
                   ].join(' · '),
                   style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                 ),
