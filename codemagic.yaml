@@ -40,7 +40,7 @@ workflows:
   # A signed APK to install straight onto Android phones for testing.
   android-test:
     name: Android — test APK
-    instance_type: linux_x2
+    instance_type: mac_mini_m2   # the free plan offers only the macOS M2 machine; it builds Android too
     max_build_duration: 45
     environment:
       <<: *env
@@ -61,7 +61,7 @@ workflows:
   # .aab from this workflow's artifacts by hand once, then this publishes.
   android-play:
     name: Android — Play internal testing
-    instance_type: linux_x2
+    instance_type: mac_mini_m2   # the free plan offers only the macOS M2 machine; it builds Android too
     max_build_duration: 45
     environment:
       <<: *env
