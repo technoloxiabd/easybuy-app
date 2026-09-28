@@ -65,7 +65,7 @@ class Category {
 }
 
 class ProductCard {
-  ProductCard({required this.id, required this.title, this.imageUrl, required this.unitPrice, required this.minQuantity, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating});
+  ProductCard({required this.id, required this.title, this.imageUrl, required this.unitPrice, required this.minQuantity, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.repurchaseRate, this.isSuperFactory = false, this.priceFrom = false, this.onPricingHold = false, this.campaignLabel, this.campaignPrice});
 
   final int id;
   final String title;
@@ -76,18 +76,49 @@ class ProductCard {
   final bool isSoldOut;
   final int saleCount;
   final String? rating;
+  final String? repurchaseRate;
+  final bool isSuperFactory;
 
-  factory ProductCard.fromJson(Json j) => ProductCard(
-        id: integer(j['id']),
-        title: str(j['title']),
-        imageUrl: strOrNull(j['image_url']),
-        unitPrice: str(j['unit_price_bdt'], '0'),
-        minQuantity: integer(j['min_quantity'], 1),
-        isFactory: boolean(j['is_factory']),
-        isSoldOut: boolean(j['is_sold_out']),
-        saleCount: integer(j['sale_count']),
-        rating: strOrNull(j['rating']),
-      );
+  /// Options priced differently: the price reads "from ৳…".
+  final bool priceFrom;
+
+  /// The website shows "Price under review" instead of a price.
+  final bool onPricingHold;
+
+  /// A running campaign's badge ("10% OFF"), and for a percent campaign the
+  /// discounted price shown beside the struck original.
+  final String? campaignLabel;
+  final String? campaignPrice;
+
+  factory ProductCard.fromJson(Json j) {
+    final campaign = objOrNull(j['campaign']);
+    return ProductCard(
+      id: integer(j['id']),
+      title: str(j['title']),
+      imageUrl: strOrNull(j['image_url']),
+      unitPrice: str(j['unit_price_bdt'], '0'),
+      minQuantity: integer(j['min_quantity'], 1),
+      isFactory: boolean(j['is_factory']),
+      isSoldOut: boolean(j['is_sold_out']),
+      saleCount: integer(j['sale_count']),
+      rating: strOrNull(j['rating']),
+      repurchaseRate: strOrNull(j['repurchase_rate']),
+      isSuperFactory: boolean(j['is_super_factory']),
+      priceFrom: boolean(j['price_from']),
+      onPricingHold: boolean(j['on_pricing_hold']),
+      campaignLabel: campaign == null ? null : strOrNull(campaign['label']),
+      campaignPrice: campaign == null ? null : strOrNull(campaign['price_bdt']),
+    );
+  }
+
+  /// What the wishlist keeps on the phone (the website keeps it in the
+  /// browser the same way): enough to draw the card again.
+  Json toJson() => {
+        'id': id, 'title': title, 'image_url': imageUrl, 'unit_price_bdt': unitPrice,
+        'min_quantity': minQuantity, 'is_factory': isFactory, 'is_sold_out': isSoldOut,
+        'sale_count': saleCount, 'rating': rating, 'repurchase_rate': repurchaseRate,
+        'is_super_factory': isSuperFactory, 'price_from': priceFrom,
+      };
 }
 
 class Attribute {
@@ -130,7 +161,7 @@ class PriceTier {
 }
 
 class ProductDetail {
-  ProductDetail({required this.id, required this.title, required this.images, required this.unitPrice, required this.minQuantity, required this.minQuantityIsSupplier, required this.priceTiers, required this.variants, required this.variantsPricedSeparately, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.estimatedWeightKg, this.slug});
+  ProductDetail({required this.id, required this.title, required this.images, required this.unitPrice, required this.minQuantity, required this.minQuantityIsSupplier, required this.priceTiers, required this.variants, required this.variantsPricedSeparately, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.estimatedWeightKg, this.slug, this.repurchaseRate, this.isSuperFactory = false, this.categoryId, this.categoryName, this.ordersCount = 0, this.onPricingHold = false, this.videoUrl, this.campaignLabel, this.minOrderAmount, this.orderNote, this.specs = const [], this.descriptionImages, this.seller, this.shippingTitle = 'Shipping charges', this.shipping = const []});
 
   final int id;
   final String title;
@@ -147,6 +178,30 @@ class ProductDetail {
   final int saleCount;
   final String? rating;
   final String? estimatedWeightKg;
+  final String? repurchaseRate;
+  final bool isSuperFactory;
+  final int? categoryId;
+  final String? categoryName;
+  final int ordersCount;
+  final bool onPricingHold;
+  final String? videoUrl;
+  final String? campaignLabel;
+  final String? minOrderAmount;
+  final String? orderNote;
+  final List<Attribute> specs;
+
+  /// Null until fetched (GET /products/{id}/description).
+  final List<String>? descriptionImages;
+  final Json? seller;
+  final String shippingTitle;
+  final List<ShippingMethod> shipping;
+
+  /// The card this product would show in a grid -- for the wishlist.
+  ProductCard toCard() => ProductCard(
+        id: id, title: title, imageUrl: images.firstOrNull, unitPrice: unitPrice, minQuantity: minQuantity,
+        isFactory: isFactory, isSoldOut: isSoldOut, saleCount: saleCount, rating: rating,
+        repurchaseRate: repurchaseRate, isSuperFactory: isSuperFactory, priceFrom: variantsPricedSeparately,
+      );
 
   factory ProductDetail.fromJson(Json j) => ProductDetail(
         id: integer(j['id']),
@@ -164,7 +219,124 @@ class ProductDetail {
         saleCount: integer(j['sale_count']),
         rating: strOrNull(j['rating']),
         estimatedWeightKg: strOrNull(j['estimated_weight_kg']),
+        repurchaseRate: strOrNull(j['repurchase_rate']),
+        isSuperFactory: boolean(j['is_super_factory']),
+        categoryId: intOrNull(obj(j['category'])['id']),
+        categoryName: strOrNull(obj(j['category'])['name']),
+        ordersCount: integer(j['orders_count']),
+        onPricingHold: boolean(j['on_pricing_hold']),
+        videoUrl: strOrNull(j['video_url']),
+        campaignLabel: strOrNull(obj(j['campaign'])['label']),
+        minOrderAmount: strOrNull(j['min_order_amount_bdt']),
+        orderNote: strOrNull(j['order_note']),
+        specs: listOf(j['specs'], (e) => Attribute(str(e['name']), str(e['value']))),
+        descriptionImages: j['description_images'] is List ? (j['description_images'] as List).map((e) => '$e').toList() : null,
+        seller: objOrNull(j['seller']),
+        shippingTitle: str(j['shipping_title'], 'Shipping charges'),
+        shipping: listOf(j['shipping'], ShippingMethod.fromJson),
       );
+}
+
+// ---------------------------------------------------------------- website pages
+
+/// Where a banner leads: product / category screen, the Shop tab, or a web page.
+class LinkTarget {
+  LinkTarget(this.type, this.id, this.url);
+  final String type;
+  final int? id;
+  final String url;
+  static LinkTarget? fromJson(Object? v) {
+    final j = objOrNull(v);
+    return j == null ? null : LinkTarget(str(j['type'], 'url'), intOrNull(j['id']), str(j['url']));
+  }
+}
+
+class HomeBanner {
+  HomeBanner(this.imageUrl, this.link);
+  final String imageUrl;
+  final LinkTarget? link;
+}
+
+class HomeVideo {
+  HomeVideo({required this.title, this.posterUrl, this.duration, this.date, required this.url});
+  final String title;
+  final String? posterUrl;
+  final String? duration;
+  final String? date;
+  final String url;
+}
+
+class HomePost {
+  HomePost({required this.title, required this.excerpt, this.coverUrl, this.category, this.read, this.date, required this.url});
+  final String title;
+  final String excerpt;
+  final String? coverUrl;
+  final String? category;
+  final String? read;
+  final String? date;
+  final String url;
+}
+
+class HomeSection {
+  HomeSection({required this.title, this.categoryId, required this.products});
+  final String title;
+  final int? categoryId;
+  final List<ProductCard> products;
+}
+
+/// GET /home -- the website's homepage, section for section.
+class HomeData {
+  HomeData({required this.banners, required this.categories, required this.videos, required this.videosHeading, required this.featured, required this.sections, required this.posts, required this.postsHeading});
+  final List<HomeBanner> banners;
+  final List<Category> categories;
+  final List<HomeVideo> videos;
+  final Json videosHeading;
+  final HomeSection featured;
+  final List<HomeSection> sections;
+  final List<HomePost> posts;
+  final Json postsHeading;
+
+  factory HomeData.fromJson(Json j) {
+    HomeSection section(Json s) => HomeSection(title: str(s['title']), categoryId: intOrNull(s['category_id']), products: listOf(s['products'], ProductCard.fromJson));
+    return HomeData(
+      banners: listOf(j['banners'], (b) => HomeBanner(str(b['image_url']), LinkTarget.fromJson(b['link']))),
+      categories: listOf(j['categories'], Category.fromJson),
+      videos: listOf(j['videos'], (v) => HomeVideo(title: str(v['title']), posterUrl: strOrNull(v['poster_url']), duration: strOrNull(v['duration']), date: strOrNull(v['date']), url: str(v['url']))),
+      videosHeading: obj(j['videos_heading']),
+      featured: section(obj(j['featured'])),
+      sections: listOf(j['sections'], section),
+      posts: listOf(j['posts'], (p) => HomePost(title: str(p['title']), excerpt: str(p['excerpt']), coverUrl: strOrNull(p['cover_url']), category: strOrNull(p['category']), read: strOrNull(p['read']), date: strOrNull(p['date']), url: str(p['url']))),
+      postsHeading: obj(j['posts_heading']),
+    );
+  }
+}
+
+/// GET /categories/{id} -- a category page's header and chips.
+class CategoryInfo {
+  CategoryInfo({required this.id, required this.name, this.parentId, this.parentName, required this.itemCount, required this.chips});
+  final int id;
+  final String name;
+  final int? parentId;
+  final String? parentName;
+  final int itemCount;
+  final List<(int, String, bool)> chips;
+  factory CategoryInfo.fromJson(Json j) => CategoryInfo(
+        id: integer(j['id']),
+        name: str(j['name']),
+        parentId: intOrNull(obj(j['parent'])['id']),
+        parentName: strOrNull(obj(j['parent'])['name']),
+        itemCount: integer(j['item_count']),
+        chips: listOf(j['chips'], (c) => (integer(c['id']), str(c['name']), boolean(c['is_active']))),
+      );
+}
+
+/// One card of the "Recommended" rail.
+class Highlight {
+  Highlight(this.label, this.background, this.foreground, this.product);
+  final String label;
+  final String background;
+  final String foreground;
+  final ProductCard product;
 }
 
 /// A page of a list plus where the next one starts (null = the end).

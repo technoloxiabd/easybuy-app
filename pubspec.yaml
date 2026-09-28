@@ -71,10 +71,21 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  assets:
+    - assets/logo.png
+
   # The website's Bengali face (SIL Open Font License). Used as a FALLBACK:
   # Latin stays the platform font, while ৳ and Bengali text render the way
   # they do on easybuy.com.bd on every phone.
   fonts:
+    # The website's Latin face (SIL OFL), so the app reads like the site.
+    - family: InstrumentSans
+      fonts:
+        - asset: assets/fonts/InstrumentSans-Regular.ttf
+        - asset: assets/fonts/InstrumentSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/InstrumentSans-Bold.ttf
+          weight: 700
     - family: AnekBangla
       fonts:
         - asset: assets/fonts/AnekBangla-Regular.ttf

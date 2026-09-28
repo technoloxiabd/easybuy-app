@@ -40,8 +40,11 @@ class EasyBuyApi {
 
   // ---------------------------------------------------------- catalogue
 
-  Future<Paged<ProductCard>> products({String? query, int? category, String? sort, String? cursor}) async {
-    final r = await client.get('/products', query: {'q': query, 'category': category, 'sort': sort, 'cursor': cursor, 'per_page': 20});
+  Future<Paged<ProductCard>> products({String? query, int? category, String? sort, String? cursor, String? minPrice, String? maxPrice, bool factoryOnly = false}) async {
+    final r = await client.get('/products', query: {
+      'q': query, 'category': category, 'sort': sort, 'cursor': cursor, 'per_page': 20,
+      'min_price': minPrice, 'max_price': maxPrice, if (factoryOnly) 'is_factory': 1,
+    });
     return Paged(listOf(r['data'], ProductCard.fromJson), strOrNull(obj(r['meta'])['next_cursor']));
   }
 
@@ -51,6 +54,20 @@ class EasyBuyApi {
       obj((await client.get('/products/$id/price', query: {'quantity': quantity, 'sku_id': skuId}))['data']);
 
   Future<List<Category>> categories() async => listOf((await client.get('/categories'))['data'], Category.fromJson);
+
+  Future<HomeData> home() async => HomeData.fromJson(obj((await client.get('/home'))['data']));
+
+  Future<CategoryInfo> category(int id) async => CategoryInfo.fromJson(obj((await client.get('/categories/$id'))['data']));
+
+  Future<List<Highlight>> highlights({int? category}) async => listOf(
+        (await client.get('/products/highlights', query: {'category': category}))['data'],
+        (h) => Highlight(str(h['label']), str(h['background'], '#f3f4f6'), str(h['foreground'], '#4b5563'), ProductCard.fromJson(obj(h['product']))),
+      );
+
+  Future<List<String>> description(int productId) async {
+    final data = obj((await client.get('/products/$productId/description'))['data']);
+    return data['images'] is List ? (data['images'] as List).map((e) => '$e').toList() : const [];
+  }
 
   Future<List<String>> suggest(String q) async {
     final r = await client.get('/search/suggest', query: {'q': q});

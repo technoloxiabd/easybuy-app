@@ -71,15 +71,16 @@ class AccountScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           Row(children: [
-            _Stat(label: 'Orders', value: '${orders['total'] ?? '–'}', onTap: () => context.go('/orders')),
+            _Stat(label: 'Orders', value: '${orders['total'] ?? '–'}', onTap: () => context.push('/orders')),
             const SizedBox(width: 8),
-            _Stat(label: 'Need action', value: '${orders['action_needed'] ?? '–'}', onTap: () => context.go('/orders')),
+            _Stat(label: 'Need action', value: '${orders['action_needed'] ?? '–'}', onTap: () => context.push('/orders')),
             const SizedBox(width: 8),
             _Stat(label: 'Balance', value: overview == null ? '–' : Money.bdt(str(overview['credit_balance_bdt'])), onTap: () => context.push('/account/credit')),
           ]),
           const SizedBox(height: 10),
           Card(
             child: Column(children: [
+              _Item(Icons.receipt_long_outlined, 'My orders', '/orders'),
               _Item(Icons.chat_bubble_outline, 'Messages', '/chat', badge: unread),
               _Item(Icons.support_agent, 'Complaints & support', '/support'),
               _Item(Icons.account_balance_wallet_outlined, 'Payment history', '/account/payments'),

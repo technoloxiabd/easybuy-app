@@ -5,9 +5,10 @@ import 'package:easybuy/ui/app.dart' show pushRoute;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('money reads like the website: whole taka, Indian grouping', () {
+  test('money reads like the website: whole taka, Western grouping', () {
     expect(Money.bdt('3381.00'), '৳3,381');
-    expect(Money.bdt('162546.50'), '৳1,62,546.50');
+    expect(Money.bdt('312200.00'), '৳312,200');
+    expect(Money.bdt('162546.50'), '৳162,547');
     expect(Money.bdt(null), '৳0');
     expect(Money.isPositive('0.00'), isFalse);
     expect(Money.isPositive('0.50'), isTrue);

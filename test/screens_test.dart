@@ -35,6 +35,11 @@ Future<void> _loadFonts() async {
       .load();
   await (FontLoader('MaterialIcons')..addFont(bytes('MaterialIcons-Regular.otf'))).load();
   Future<ByteData> asset(String f) async => ByteData.sublistView(await File('assets/fonts/$f').readAsBytes());
+  await (FontLoader('InstrumentSans')
+        ..addFont(asset('InstrumentSans-Regular.ttf'))
+        ..addFont(asset('InstrumentSans-SemiBold.ttf'))
+        ..addFont(asset('InstrumentSans-Bold.ttf')))
+      .load();
   await (FontLoader('AnekBangla')
         ..addFont(asset('AnekBangla-Regular.ttf'))
         ..addFont(asset('AnekBangla-SemiBold.ttf'))
@@ -46,6 +51,9 @@ class LiveData {
   late List<Category> categories;
   late List<ProductCard> products;
   late ProductDetail detail;
+  late HomeData home;
+  late CategoryInfo category;
+  late List<Highlight> highlights;
 }
 
 class ShotApi extends EasyBuyApi {
@@ -68,10 +76,23 @@ class ShotApi extends EasyBuyApi {
   Future<List<Category>> categories() async => live.categories;
 
   @override
-  Future<Paged<ProductCard>> products({String? query, int? category, String? sort, String? cursor}) async => Paged(live.products, null);
+  Future<Paged<ProductCard>> products({String? query, int? category, String? sort, String? cursor, String? minPrice, String? maxPrice, bool factoryOnly = false}) async =>
+      Paged(live.products, null);
 
   @override
   Future<ProductDetail> product(int id) async => live.detail;
+
+  @override
+  Future<HomeData> home() async => live.home;
+
+  @override
+  Future<CategoryInfo> category(int id) async => live.category;
+
+  @override
+  Future<List<Highlight>> highlights({int? category}) async => live.highlights;
+
+  @override
+  Future<List<String>> description(int productId) async => const [];
 
   @override
   Future<Json> price(int id, int quantity, {String? skuId}) async =>
@@ -214,6 +235,7 @@ void main() {
 
   testWidgets('screens', (tester) async {
     HttpOverrides.global = null; // this test fetches real catalogue data
+    NetImage.offline = true; // no disk cache in the harness: unfetched images show the placeholder
     tester.view.physicalSize = const Size(1170, 2532);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -222,14 +244,22 @@ void main() {
     await tester.runAsync(() async {
       final real = EasyBuyApi(ApiClient(MemorySession()));
       live.categories = await real.categories();
-      live.products = (await real.products()).items.where((p) => p.imageUrl != null).take(8).toList();
-      live.detail = await real.product(live.products.first.id);
+      live.home = await real.home();
+      live.products = (await real.products(category: 12697)).items.where((p) => p.imageUrl != null).take(8).toList();
+      live.detail = await real.product(144381);
+      live.category = await real.category(12697);
+      live.highlights = await real.highlights(category: 12697);
 
       final urls = {
         ...live.products.map((p) => p.imageUrl!),
         ...live.categories.map((c) => c.imageUrl).whereType<String>(),
-        ...live.detail.images.take(1),
-        ...live.detail.variants.map((v) => v.imageUrl).whereType<String>(),
+        ...live.home.banners.map((b) => b.imageUrl),
+        ...live.home.categories.map((c) => c.imageUrl).whereType<String>(),
+        ...live.home.videos.map((v) => v.posterUrl).whereType<String>(),
+        ...live.home.featured.products.take(6).map((p) => p.imageUrl).whereType<String>(),
+        ...live.highlights.map((h) => h.product.imageUrl).whereType<String>(),
+        ...live.detail.images.take(8),
+        ...live.detail.variants.map((v) => v.imageUrl).whereType<String>().take(12),
       };
       final client = HttpClient();
       for (final u in urls) {
@@ -260,47 +290,44 @@ void main() {
 
     final router = ProviderScope.containerOf(tester.element(find.byType(EasyBuyApp))).read(routerProvider);
 
+    // Scroll the screen's main vertical list to [y] and let it settle.
+    Future<void> scrollTo(double y) async {
+      final scrollables = find.byWidgetPredicate((w) => w is Scrollable && w.axisDirection == AxisDirection.down);
+      final state = tester.state<ScrollableState>(scrollables.first);
+      state.position.jumpTo(y.clamp(0, state.position.maxScrollExtent));
+      await settle();
+    }
+
     await settle();
     await shot('01_home');
+    await scrollTo(760);
+    await shot('02_home_videos');
+    await scrollTo(1500);
+    await shot('03_home_popular');
 
-    router.push('/product/${live.detail.id}');
+    router.go('/categories');
     await settle();
-    await shot('02_product');
+    await shot('04_categories');
+
+    router.push('/category/12697');
+    await settle();
+    await shot('05_category');
+    router.pop();
+    await settle();
+
+    router.push('/product/144381');
+    await settle();
+    await shot('06_product');
+    await scrollTo(880);
+    await shot('07_product_options');
+    await scrollTo(1900);
+    await shot('08_product_shipping');
     router.pop();
     await settle();
 
     router.go('/cart');
     await settle();
-    await shot('03_cart');
-
-    router.push('/checkout');
-    await settle();
-    await shot('04_checkout');
-    router.pop();
-    await settle();
-
-    router.go('/orders');
-    await settle();
-    await shot('05_orders');
-
-    router.push('/orders/SEP214087');
-    await settle();
-    await shot('06_order');
-
-    router.push('/orders/SEP214087/pay');
-    await settle();
-    await shot('07_pay');
-    router.pop();
-    router.pop();
-    await settle();
-
-    router.go('/account');
-    await settle();
-    await shot('08_account');
-
-    router.push('/chat');
-    await settle();
-    await shot('09_chat');
+    await shot('09_cart');
 
     await tester.pumpWidget(const SizedBox());
   }, timeout: const Timeout(Duration(minutes: 3)));

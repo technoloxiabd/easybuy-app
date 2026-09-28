@@ -100,7 +100,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           );
       await ref.read(cartProvider.notifier).refresh();
       if (!mounted) return;
-      context.go('/orders');
+      context.go('/account');
       context.push('/orders/${order.number}');
       if (order.nextPayment != null) context.push('/orders/${order.number}/pay');
       showMessage(context, 'Order ${order.number} placed. Thank you!');

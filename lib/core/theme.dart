@@ -7,7 +7,16 @@ class Brand {
   static const orange = Color(0xFFE96B40);
   static const orangeDark = Color(0xFFD55A30);
   static const ink = Color(0xFF1E1E1E);
-  static const page = Color(0xFFF5FAFF);
+  /// The website's body and header: Tailwind gray-100.
+  static const page = Color(0xFFF3F4F6);
+
+  /// The homepage's alternating bands.
+  static const bandLight = Color(0xFFF5FAFF);
+  static const bandTint = Color(0xFFDBE7EE);
+
+  /// Soft blue category tiles.
+  static const tile = Color(0xFFEEF4FC);
+  static const grayText = Color(0xFF6B7280);
   static const success = Color(0xFF15803D);
   static const warning = Color(0xFFB45309);
   static const danger = Color(0xFFB91C1C);
@@ -23,16 +32,22 @@ ThemeData buildTheme() {
 
   // Built in two steps so the button text can start from the theme's own
   // label style: a bare TextStyle there would drop the font family.
-  final base = ThemeData(colorScheme: scheme, useMaterial3: true, fontFamilyFallback: const ['AnekBangla']);
+  // The website's own faces: Instrument Sans, with Anek Bangla for ৳ and Bengali.
+  final base = ThemeData(colorScheme: scheme, useMaterial3: true, fontFamily: 'InstrumentSans', fontFamilyFallback: const ['AnekBangla']);
   final label = base.textTheme.labelLarge!.copyWith(fontWeight: FontWeight.w700, fontSize: 15, fontFamilyFallback: const ['AnekBangla']);
 
   return base.copyWith(
     scaffoldBackgroundColor: Brand.page,
+    // Like the website's header: gray-100, dark text, a soft shadow.
     appBarTheme: const AppBarTheme(
-      backgroundColor: Brand.blue,
-      foregroundColor: Colors.white,
-      elevation: 0,
+      backgroundColor: Brand.page,
+      foregroundColor: Brand.ink,
+      surfaceTintColor: Colors.transparent,
+      elevation: 1,
+      scrolledUnderElevation: 1,
+      shadowColor: Color(0x33000000),
       centerTitle: false,
+      titleTextStyle: TextStyle(fontFamily: 'InstrumentSans', fontFamilyFallback: ['AnekBangla'], color: Brand.ink, fontSize: 18, fontWeight: FontWeight.w700),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

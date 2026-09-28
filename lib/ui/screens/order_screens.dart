@@ -97,7 +97,7 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   ? ListView(children: [ErrorView(error: _error!, onRetry: _reset)])
                   : _orders.isEmpty && _done
                       ? ListView(children: [
-                          EmptyState(icon: Icons.receipt_long_outlined, title: 'No orders yet', action: FilledButton(onPressed: () => context.go('/'), child: const Text('Start shopping'))),
+                          EmptyState(icon: Icons.receipt_long_outlined, title: 'No orders yet', action: FilledButton(onPressed: () => context.go('/shop'), child: const Text('Start shopping'))),
                         ])
                       : NotificationListener<ScrollNotification>(
                           onNotification: (n) {

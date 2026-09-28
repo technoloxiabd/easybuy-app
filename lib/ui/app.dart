@@ -11,10 +11,15 @@ import 'screens/account_screens.dart';
 import 'screens/auth_screens.dart';
 import 'screens/cart_screen.dart';
 import 'screens/catalog_screens.dart';
+import 'screens/categories_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/listing_screen.dart';
+import 'screens/product_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/order_screens.dart';
 import 'screens/pay_screen.dart';
 import 'screens/support_screens.dart';
+import '../state/wishlist.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -40,21 +45,20 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       StatefulShellRoute.indexedStack(
         builder: (context, state, shell) => HomeShell(shell: shell),
+        // The website's phone tab bar: Home, Categories, Cart, Wishlist, Shop, Account.
         branches: [
           StatefulShellBranch(routes: [GoRoute(path: '/', builder: (_, _) => const HomeScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/categories', builder: (_, _) => const CategoriesScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/cart', builder: (_, _) => const CartScreen())]),
-          StatefulShellBranch(routes: [GoRoute(path: '/orders', builder: (_, _) => const OrdersScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/wishlist', builder: (_, _) => const WishlistScreen())]),
+          StatefulShellBranch(routes: [GoRoute(path: '/shop', builder: (_, _) => const ListingScreen())]),
           StatefulShellBranch(routes: [GoRoute(path: '/account', builder: (_, _) => const AccountScreen())]),
         ],
       ),
       GoRoute(path: '/search', parentNavigatorKey: _rootKey, builder: (_, s) => SearchScreen(initial: s.uri.queryParameters['q'])),
-      GoRoute(
-        path: '/category/:id',
-        parentNavigatorKey: _rootKey,
-        builder: (_, s) => CategoryProductsScreen(id: int.parse(s.pathParameters['id']!), name: s.uri.queryParameters['name'] ?? 'Products'),
-      ),
+      GoRoute(path: '/category/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(categoryId: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/product/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ProductScreen(id: int.parse(s.pathParameters['id']!))),
+      GoRoute(path: '/orders', parentNavigatorKey: _rootKey, builder: (_, _) => const OrdersScreen()),
       GoRoute(path: '/checkout', parentNavigatorKey: _rootKey, builder: (_, _) => const CheckoutScreen()),
       GoRoute(path: '/orders/:number', parentNavigatorKey: _rootKey, builder: (_, s) => OrderScreen(number: s.pathParameters['number']!)),
       GoRoute(
@@ -149,25 +153,59 @@ class HomeShell extends ConsumerWidget {
   const HomeShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
 
+  static const _tabs = [
+    (Icons.home_outlined, 'Home'),
+    (Icons.menu, 'Categories'),
+    (Icons.shopping_cart_outlined, 'Cart'),
+    (Icons.favorite_border, 'Wishlist'),
+    (Icons.storefront_outlined, 'Shop'),
+    (Icons.person_outline, 'Account'),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final count = ref.watch(cartCountProvider);
+    final cartCount = ref.watch(cartCountProvider);
+    final saved = ref.watch(wishlistProvider).length;
     return Scaffold(
       body: shell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: shell.currentIndex,
-        onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-        destinations: [
-          const NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
-          const NavigationDestination(icon: Icon(Icons.grid_view_outlined), selectedIcon: Icon(Icons.grid_view), label: 'Categories'),
-          NavigationDestination(
-            icon: Badge(isLabelVisible: count > 0, label: Text('$count'), child: const Icon(Icons.shopping_cart_outlined)),
-            selectedIcon: Badge(isLabelVisible: count > 0, label: Text('$count'), child: const Icon(Icons.shopping_cart)),
-            label: 'Cart',
-          ),
-          const NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Orders'),
-          const NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Account'),
-        ],
+      // The website's bottom bar: white, hairline top, the active tab orange
+      // with a short orange dash above it.
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+          boxShadow: [BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, -2))],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Row(children: [
+            for (final (i, (icon, label)) in _tabs.indexed)
+              Expanded(
+                child: InkWell(
+                  onTap: () => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8, bottom: 6),
+                    child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
+                      if (i == shell.currentIndex)
+                        Positioned(top: -9, child: Container(width: 32, height: 2.5, decoration: BoxDecoration(color: Brand.orange, borderRadius: BorderRadius.circular(2)))),
+                      Column(mainAxisSize: MainAxisSize.min, children: [
+                        Badge(
+                          isLabelVisible: (i == 2 && cartCount > 0) || (i == 3 && saved > 0),
+                          backgroundColor: Brand.orange,
+                          label: Text('${i == 2 ? cartCount : saved}'),
+                          child: Icon(icon, size: 24, color: i == shell.currentIndex ? Brand.orange : const Color(0xFF4B5563)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(label,
+                            maxLines: 1,
+                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: i == shell.currentIndex ? Brand.orange : const Color(0xFF4B5563))),
+                      ]),
+                    ]),
+                  ),
+                ),
+              ),
+          ]),
+        ),
       ),
     );
   }
