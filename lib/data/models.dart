@@ -258,12 +258,34 @@ class HomeBanner {
 }
 
 class HomeVideo {
-  HomeVideo({required this.title, this.posterUrl, this.duration, this.date, required this.url});
+  HomeVideo({required this.title, this.posterUrl, this.duration, this.date, required this.url, this.provider, this.embedUrl, this.aspectRatio, this.category});
   final String title;
   final String? posterUrl;
   final String? duration;
   final String? date;
+
+  /// The website's watch page: shared, and the fallback when there is no embed.
   final String url;
+  final String? provider;
+
+  /// What the app plays in place (YouTube / Facebook / stream iframe).
+  final String? embedUrl;
+
+  /// Width / height; null is the standard 16:9 frame.
+  final double? aspectRatio;
+  final String? category;
+
+  factory HomeVideo.fromJson(Json v) => HomeVideo(
+        title: str(v['title']),
+        posterUrl: strOrNull(v['poster_url']),
+        duration: strOrNull(v['duration']),
+        date: strOrNull(v['date']),
+        url: str(v['url']),
+        provider: strOrNull(v['provider']),
+        embedUrl: strOrNull(v['embed_url']),
+        aspectRatio: v['aspect_ratio'] is num ? (v['aspect_ratio'] as num).toDouble() : null,
+        category: strOrNull(v['category']),
+      );
 }
 
 class HomePost {
@@ -301,7 +323,7 @@ class HomeData {
     return HomeData(
       banners: listOf(j['banners'], (b) => HomeBanner(str(b['image_url']), LinkTarget.fromJson(b['link']))),
       categories: listOf(j['categories'], Category.fromJson),
-      videos: listOf(j['videos'], (v) => HomeVideo(title: str(v['title']), posterUrl: strOrNull(v['poster_url']), duration: strOrNull(v['duration']), date: strOrNull(v['date']), url: str(v['url']))),
+      videos: listOf(j['videos'], HomeVideo.fromJson),
       videosHeading: obj(j['videos_heading']),
       featured: section(obj(j['featured'])),
       sections: listOf(j['sections'], section),
@@ -340,6 +362,13 @@ class Highlight {
 }
 
 /// A page of a list plus where the next one starts (null = the end).
+/// One page of a search by photo; [nextPage] null when there is no more.
+class ImageMatches {
+  ImageMatches({required this.products, this.nextPage});
+  final List<ProductCard> products;
+  final int? nextPage;
+}
+
 class Paged<T> {
   Paged(this.items, this.nextCursor);
   final List<T> items;

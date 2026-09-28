@@ -47,6 +47,10 @@ dependencies:
   shared_preferences: ^2.5.5
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
+  video_player: ^2.14.0
+  webview_flutter: ^4.14.1
+  webview_flutter_android: ^4.14.1
+  webview_flutter_wkwebview: ^3.26.1
 
 dev_dependencies:
   flutter_test:

@@ -15,10 +15,11 @@ import '../../state/providers.dart';
 import '../../state/wishlist.dart';
 import '../widgets/common.dart';
 import '../widgets/site.dart';
+import '../widgets/video.dart';
 import 'catalog_screens.dart' show QtyStepper;
-import 'order_screens.dart' show openExternal;
 
 final productProvider = FutureProvider.autoDispose.family<ProductDetail, int>((ref, id) => ref.read(apiProvider).product(id));
+final relatedProvider = FutureProvider.autoDispose.family<List<ProductCard>, int>((ref, id) => ref.read(apiProvider).related(id));
 
 /// The website's product page (catalog/show.blade.php), section for section.
 class ProductScreen extends ConsumerWidget {
@@ -73,6 +74,13 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
 
   List<Variant> get _rows => p.variants.where((v) => (v.attributes.firstOrNull?.value ?? v.skuId) == _selectedValue).toList();
 
+  /// Pieces chosen under one colour/option, for its swatch badge -- without
+  /// it, quantities picked under an option you have moved away from are
+  /// invisible (the website's reason too).
+  int _countFor(String value) => p.variants
+      .where((v) => (v.attributes.firstOrNull?.value ?? v.skuId) == value)
+      .fold(0, (sum, v) => sum + (_qty[v.skuId] ?? 0));
+
   @override
   void initState() {
     super.initState();
@@ -89,18 +97,41 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
     setState(() {});
     _debounce?.cancel();
     final pieces = _pieces;
-    if (pieces < p.minQuantity || (_hasOptions && p.variantsPricedSeparately)) {
+    if (pieces < p.minQuantity) {
       setState(() => _lineTotal = null);
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       try {
-        final r = await ref.read(apiProvider).price(p.id, pieces, skuId: _hasOptions ? null : p.variants.firstOrNull?.skuId);
-        if (mounted && pieces == _pieces) setState(() => _lineTotal = '${r['line_total_bdt']}');
+        final total = _hasOptions && p.variantsPricedSeparately ? await _variantTotal(pieces) : await _plainTotal(pieces);
+        if (mounted && pieces == _pieces) setState(() => _lineTotal = total);
       } catch (_) {
         if (mounted) setState(() => _lineTotal = null);
       }
     });
+  }
+
+  Future<String> _plainTotal(int pieces) async {
+    final r = await ref.read(apiProvider).price(p.id, pieces, skuId: _hasOptions ? null : p.variants.firstOrNull?.skuId);
+    return '${r['line_total_bdt']}';
+  }
+
+  /// Options priced apart: each chosen option at ITS price, at the break the
+  /// COMBINED quantity reaches -- the cart's rule (1688 counts the whole
+  /// product towards a break). The server prices each; the app only adds.
+  /// This used to show ৳0 on every such product.
+  Future<String> _variantTotal(int pieces) async {
+    final lines = _qty.entries.where((e) => e.value > 0).toList();
+    final api = ref.read(apiProvider);
+    final units = lines.length <= 20
+        ? await Future.wait(lines.map((e) async => double.tryParse('${(await api.price(p.id, pieces, skuId: e.key))['unit_price_bdt']}') ?? 0))
+        // A very wide pick: the rows' own prices rather than a burst of calls.
+        : lines.map((e) => double.tryParse(p.variants.firstWhere((v) => v.skuId == e.key).unitPrice) ?? 0).toList();
+    var sum = 0.0;
+    for (final (i, e) in lines.indexed) {
+      sum += units[i] * e.value;
+    }
+    return sum.toStringAsFixed(2);
   }
 
   Future<void> _add({required bool buyNow}) async {
@@ -136,6 +167,7 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
         if (p.shipping.isNotEmpty) ...[const SizedBox(height: 16), _ShippingCard(title: p.shippingTitle, methods: p.shipping)],
         const SizedBox(height: 16),
         _InfoTabs(product: p),
+        _Related(product: p),
       ]),
       bottomNavigationBar: _bottomBar(),
     );
@@ -300,31 +332,38 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
           crossAxisCount: 5,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
+          // Room for the count badges, which sit over the corners.
+          clipBehavior: Clip.none,
+          padding: const EdgeInsets.only(top: 6, right: 6),
           mainAxisSpacing: 8,
           crossAxisSpacing: 8,
           children: [
             for (final (value, image) in shown)
               GestureDetector(
                 onTap: () => setState(() => _selectedValue = value),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: value == _selectedValue ? Brand.blue : const Color(0xFFE5E7EB), width: value == _selectedValue ? 2.5 : 1),
+                child: Stack(clipBehavior: Clip.none, children: [
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: value == _selectedValue ? Brand.blue : const Color(0xFFE5E7EB), width: value == _selectedValue ? 2.5 : 1),
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: NetImage(image, radius: 7),
+                    ),
                   ),
-                  padding: const EdgeInsets.all(2),
-                  child: Stack(fit: StackFit.expand, children: [
-                    NetImage(image, radius: 7),
-                    if ((_qty.entries.where((e) => p.variants.any((v) => v.skuId == e.key && (v.attributes.firstOrNull?.value ?? v.skuId) == value)).fold(0, (a, e) => a + e.value)) > 0)
-                      const Positioned(right: 2, top: 2, child: CircleAvatar(radius: 7, backgroundColor: Brand.orange, child: Icon(Icons.check, size: 10, color: Colors.white))),
-                  ]),
-                ),
+                  if (_countFor(value) > 0) Positioned(right: -6, top: -6, child: _CountBadge(_countFor(value))),
+                ]),
               ),
           ],
         )
       else
         Wrap(spacing: 8, runSpacing: 8, children: [
           for (final (value, _) in shown)
-            ChoiceChip(label: Text(value), selected: value == _selectedValue, onSelected: (_) => setState(() => _selectedValue = value)),
+            Stack(clipBehavior: Clip.none, children: [
+              ChoiceChip(label: Text(value), selected: value == _selectedValue, onSelected: (_) => setState(() => _selectedValue = value)),
+              if (_countFor(value) > 0) Positioned(right: -6, top: -6, child: _CountBadge(_countFor(value))),
+            ]),
         ]),
       if (values.length > 10)
         Align(
@@ -348,9 +387,9 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
             color: const Color(0xFFF9FAFB),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: const Row(children: [
-              Expanded(flex: 5, child: Text('OPTION', style: TextStyle(fontWeight: FontWeight.w700, color: Brand.grayText, fontSize: 13, letterSpacing: .5))),
+              Expanded(flex: 4, child: Text('OPTION', style: TextStyle(fontWeight: FontWeight.w700, color: Brand.grayText, fontSize: 13, letterSpacing: .5))),
               Expanded(flex: 2, child: Text('PRICE', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: Brand.grayText, fontSize: 13, letterSpacing: .5))),
-              Expanded(flex: 4, child: Text('QUANTITY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: Brand.grayText, fontSize: 13, letterSpacing: .5))),
+              Expanded(flex: 5, child: Text('QUANTITY', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.w700, color: Brand.grayText, fontSize: 13, letterSpacing: .5))),
             ]),
           ),
           for (final v in _rows)
@@ -359,7 +398,7 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
               decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFF3F4F6)))),
               child: Row(children: [
                 Expanded(
-                  flex: 5,
+                  flex: 4,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(v.attributes.length > 1 ? Attribute.describe(v.attributes.skip(1).toList()) : (v.attributes.firstOrNull?.value ?? v.skuId), style: const TextStyle(fontSize: 15)),
                     if (v.stock != null) Text('${NumberFormat('#,##0').format(v.stock)} in stock', style: const TextStyle(color: Color(0xFF15803D), fontWeight: FontWeight.w700, fontSize: 13)),
@@ -371,7 +410,7 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
                       textAlign: TextAlign.center, style: const TextStyle(color: Brand.orange, fontWeight: FontWeight.w700)),
                 ),
                 Expanded(
-                  flex: 4,
+                  flex: 5,
                   child: Center(
                     child: (_qty[v.skuId] ?? 0) == 0
                         ? FilledButton(
@@ -384,10 +423,14 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
                             },
                             child: const Text('Add'),
                           )
-                        : QtyStepper(value: _qty[v.skuId] ?? 0, onChanged: (n) {
-                            _qty[v.skuId] = n;
-                            _changed();
-                          }),
+                        // Shrinks rather than overflows on the narrowest phones.
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: QtyStepper(value: _qty[v.skuId] ?? 0, onChanged: (n) {
+                              _qty[v.skuId] = n;
+                              _changed();
+                            }),
+                          ),
                   ),
                 ),
               ]),
@@ -462,6 +505,28 @@ class _BarIcon extends StatelessWidget {
       );
 }
 
+/// The website's swatch badge: the pieces chosen under that option, in a
+/// blue bubble on the swatch's corner.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge(this.count);
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        constraints: const BoxConstraints(minWidth: 22),
+        height: 22,
+        padding: const EdgeInsets.symmetric(horizontal: 5),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Brand.blue,
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(color: Colors.white, width: 1.5),
+          boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 3, offset: Offset(0, 1))],
+        ),
+        child: Text(NumberFormat('#,##0').format(count), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.1)),
+      );
+}
+
 class _Pill extends StatelessWidget {
   const _Pill({required this.text, this.icon, this.filled = false});
   final String text;
@@ -531,8 +596,26 @@ class _Gallery extends StatefulWidget {
 }
 
 class _GalleryState extends State<_Gallery> {
-  final _pages = PageController();
+  PageController _pages = PageController();
   int _index = 0;
+
+  /// The main frame shows the video instead of the photos, as the website's
+  /// gallery does; any photo thumb brings the photos back (and stops it).
+  bool _video = false;
+
+  void _showPhoto(int i) {
+    if (_video) {
+      // The photos come back as a fresh PageView, opened on the chosen one.
+      _pages.dispose();
+      setState(() {
+        _pages = PageController(initialPage: i);
+        _index = i;
+        _video = false;
+      });
+      return;
+    }
+    _pages.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+  }
 
   @override
   void dispose() {
@@ -556,11 +639,14 @@ class _GalleryState extends State<_Gallery> {
   @override
   Widget build(BuildContext context) {
     final images = widget.images;
+    if (images.isEmpty && widget.videoUrl != null) return AspectRatio(aspectRatio: 1, child: ProductVideo(url: widget.videoUrl!));
     if (images.isEmpty) return const AspectRatio(aspectRatio: 1, child: NetImage(null));
     return Column(children: [
       AspectRatio(
         aspectRatio: 1,
-        child: Stack(children: [
+        child: _video
+            ? ProductVideo(url: widget.videoUrl!, poster: images.first)
+            : Stack(children: [
           PageView.builder(
             controller: _pages,
             itemCount: images.length,
@@ -583,22 +669,25 @@ class _GalleryState extends State<_Gallery> {
       SizedBox(
         height: 72,
         child: ListView(scrollDirection: Axis.horizontal, children: [
-          if (widget.videoUrl != null)
+          for (final (i, url) in images.indexed) ...[
             _Thumb(
-              selected: false,
-              onTap: () => openExternal(context, widget.videoUrl!),
-              child: Stack(fit: StackFit.expand, children: [
-                NetImage(images.first, radius: 8),
-                Container(color: Colors.black26),
-                const Center(child: CircleAvatar(radius: 16, backgroundColor: Colors.white, child: Icon(Icons.play_arrow_rounded, color: Brand.ink))),
-              ]),
-            ),
-          for (final (i, url) in images.indexed)
-            _Thumb(
-              selected: i == _index,
-              onTap: () => _pages.animateToPage(i, duration: const Duration(milliseconds: 300), curve: Curves.easeOut),
+              selected: !_video && i == _index,
+              onTap: () => _showPhoto(i),
               child: NetImage(url, radius: 8),
             ),
+            // Second position, as on the website: the first photo stays the
+            // lead, and the video is never buried at the end of a long strip.
+            if (i == 0 && widget.videoUrl != null)
+              _Thumb(
+                selected: _video,
+                onTap: () => setState(() => _video = true),
+                child: Stack(fit: StackFit.expand, children: [
+                  NetImage(images.first, radius: 8),
+                  Container(decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(8))),
+                  const Center(child: CircleAvatar(radius: 16, backgroundColor: Colors.white, child: Icon(Icons.play_arrow_rounded, color: Brand.ink))),
+                ]),
+              ),
+          ],
         ]),
       ),
     ]);
@@ -705,6 +794,52 @@ class _ShippingCardState extends State<_ShippingCard> {
             ]),
           ),
       ]),
+    );
+  }
+}
+
+// ------------------------------------------------------------------ related
+
+/// The website's "Related products" strip: the same category's top sellers,
+/// two-up in the standard card, below the tabs. Loads after the page and
+/// draws nothing when there is nothing to show (or it fails), as the
+/// website's partial does.
+class _Related extends ConsumerWidget {
+  const _Related({required this.product});
+  final ProductDetail product;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(relatedProvider(product.id)).value ?? const <ProductCard>[];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: WebCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          KickerHeader(
+            title: 'Related products',
+            onViewAll: product.categoryId == null ? null : () => context.push('/category/${product.categoryId}'),
+          ),
+          const SizedBox(height: 14),
+          LayoutBuilder(builder: (context, box) {
+            // The same sizing as the listing grid's cards.
+            final card = (box.maxWidth - 12) / 2;
+            return GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                mainAxisExtent: card + 122 * MediaQuery.textScalerOf(context).scale(1),
+              ),
+              itemCount: items.length,
+              itemBuilder: (_, i) => WebProductCard(product: items[i]),
+            );
+          }),
+        ]),
+      ),
     );
   }
 }

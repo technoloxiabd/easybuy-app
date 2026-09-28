@@ -9,6 +9,7 @@ import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/site.dart';
+import '../widgets/video.dart';
 import 'order_screens.dart' show openExternal;
 
 final homeProvider = FutureProvider<HomeData>((ref) => ref.read(apiProvider).home());
@@ -270,7 +271,7 @@ class _VideoBand extends StatelessWidget {
               title: '${heading['title'] ?? 'See how importing works'}',
               subtitle: heading['subtitle'] == null ? null : '${heading['subtitle']}',
               light: true,
-              onViewAll: heading['url'] == null ? null : () => openExternal(context, '${heading['url']}'),
+              onViewAll: () => context.push('/videos'),
             ),
           ),
           const SizedBox(height: 16),
@@ -286,7 +287,7 @@ class _VideoBand extends StatelessWidget {
                 final v = videos[i];
                 final width = MediaQuery.of(context).size.width * 0.66;
                 return GestureDetector(
-                  onTap: () => openExternal(context, v.url),
+                  onTap: () => openVideo(context, v),
                   child: SizedBox(
                     width: width,
                     child: Column(children: [
@@ -375,7 +376,7 @@ class _BlogBand extends StatelessWidget {
               KickerHeader(
                 title: '${heading['title'] ?? 'Learn before you buy'}',
                 subtitle: heading['subtitle'] == null ? null : '${heading['subtitle']}',
-                onViewAll: heading['url'] == null ? null : () => openExternal(context, '${heading['url']}'),
+                onViewAll: () => context.push('/videos'),
               ),
             ]),
           ),

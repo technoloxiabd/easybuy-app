@@ -41,8 +41,10 @@ class ApiClient {
   final Dio dio;
   void Function()? onSignedOut;
 
-  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) =>
-      _send(() => dio.get(path, queryParameters: _clean(query)));
+  /// [receiveTimeout] lifts the default 30s for the few calls that wait on
+  /// a slow upstream (a search by photo can take 20s at the supplier).
+  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query, Duration? receiveTimeout}) =>
+      _send(() => dio.get(path, queryParameters: _clean(query), options: receiveTimeout == null ? null : Options(receiveTimeout: receiveTimeout)));
 
   Future<Map<String, dynamic>> post(String path, {Object? body, Map<String, String>? headers}) =>
       _send(() => dio.post(path, data: body, options: Options(headers: headers)));

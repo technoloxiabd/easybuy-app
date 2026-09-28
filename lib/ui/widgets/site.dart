@@ -4,10 +4,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
 import '../../data/models.dart';
+import '../screens/image_search_screen.dart' show startImageSearch;
 import 'common.dart';
 
-/// The website's phone header: the easyBUY logo and a rounded search pill on
-/// gray-100, with a soft shadow. Tapping the pill opens search.
+/// The website's phone header: the easyBUY logo, a rounded search pill, and
+/// the blue camera button. Tapping the pill opens search.
 class SiteHeader extends StatelessWidget implements PreferredSizeWidget {
   const SiteHeader({super.key, this.leading});
   final Widget? leading;
@@ -40,6 +41,20 @@ class SiteHeader extends StatelessWidget implements PreferredSizeWidget {
                   Expanded(child: Text('Search', style: TextStyle(color: Colors.grey.shade500, fontSize: 15, fontWeight: FontWeight.w400))),
                   const Icon(Icons.search, color: Brand.blue, size: 22),
                 ]),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // The website's camera button: search 1688 by photo.
+          Tooltip(
+            message: 'Search by image',
+            child: Material(
+              color: Brand.blue,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => startImageSearch(context),
+                child: const SizedBox(width: 42, height: 42, child: Icon(Icons.photo_camera_outlined, color: Colors.white, size: 21)),
               ),
             ),
           ),

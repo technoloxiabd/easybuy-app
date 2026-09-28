@@ -54,6 +54,9 @@ class LiveData {
   late HomeData home;
   late CategoryInfo category;
   late List<Highlight> highlights;
+  late List<ProductCard> related;
+  late (List<HomeVideo>, List<String>) videos;
+  late String photo;
 }
 
 class ShotApi extends EasyBuyApi {
@@ -93,6 +96,20 @@ class ShotApi extends EasyBuyApi {
 
   @override
   Future<List<String>> description(int productId) async => const [];
+
+  @override
+  Future<List<ProductCard>> related(int id) async => live.related;
+
+  @override
+  Future<(List<HomeVideo>, List<String>)> videos({String? category}) async => live.videos;
+
+  // Sample matches from the live catalogue: a real photo search spends
+  // metered supplier calls, and the screen is what is under review here.
+  @override
+  Future<String> uploadSearchImage(String path) async => 'shot.jpg';
+
+  @override
+  Future<ImageMatches> imageMatches(String upload, {int? page, String? sort}) async => ImageMatches(products: live.products, nextPage: 2);
 
   @override
   Future<Json> price(int id, int quantity, {String? skuId}) async =>
@@ -249,6 +266,8 @@ void main() {
       live.detail = await real.product(144381);
       live.category = await real.category(12697);
       live.highlights = await real.highlights(category: 12697);
+      live.related = await real.related(144381);
+      live.videos = await real.videos();
 
       final urls = {
         ...live.products.map((p) => p.imageUrl!),
@@ -260,6 +279,8 @@ void main() {
         ...live.highlights.map((h) => h.product.imageUrl).whereType<String>(),
         ...live.detail.images.take(8),
         ...live.detail.variants.map((v) => v.imageUrl).whereType<String>().take(12),
+        ...live.related.map((p) => p.imageUrl).whereType<String>(),
+        ...live.videos.$1.map((v) => v.posterUrl).whereType<String>(),
       };
       final client = HttpClient();
       for (final u in urls) {
@@ -269,6 +290,11 @@ void main() {
           if (res.statusCode == 200) NetImage.preloaded[u] = Uint8List.fromList(bytes);
         } catch (_) {}
       }
+
+      // The photo a shopper would search with: a live product's own picture.
+      final photo = File('${Directory.systemTemp.path}/shot-photo.jpg');
+      await photo.writeAsBytes(NetImage.preloaded[live.products.first.imageUrl!] ?? const []);
+      live.photo = photo.path;
     });
 
     final session = MemorySession();
@@ -319,9 +345,31 @@ void main() {
     await settle();
     await shot('06_product');
     await scrollTo(880);
+    // Pick a quantity so the swatch shows its count badge.
+    await tester.tap(find.widgetWithText(FilledButton, 'Add').first);
+    await settle();
     await shot('07_product_options');
     await scrollTo(1900);
     await shot('08_product_shipping');
+    // A lazy list learns its full length as it scrolls: step to the end.
+    for (var i = 0; i < 6; i++) {
+      await scrollTo(100000);
+    }
+    await shot('10_product_related');
+    router.pop();
+    await settle();
+
+    router.push('/search/image', extra: live.photo);
+    await settle();
+    // (The photo itself, an Image.file, does not decode inside this harness's
+    // fake clock and shows blank here; on a phone it is an ordinary file read.)
+    await shot('11_image_search');
+    router.pop();
+    await settle();
+
+    router.push('/videos');
+    await settle();
+    await shot('12_videos');
     router.pop();
     await settle();
 

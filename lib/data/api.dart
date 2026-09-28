@@ -50,6 +50,30 @@ class EasyBuyApi {
 
   Future<ProductDetail> product(int id) async => ProductDetail.fromJson(obj((await client.get('/products/$id'))['data']));
 
+  /// The product page's "Related products": the website's same eight.
+  Future<List<ProductCard>> related(int id) async => listOf((await client.get('/products/$id/related'))['data'], ProductCard.fromJson);
+
+  /// Search by photo, step one: upload it; the server starts searching at once.
+  Future<String> uploadSearchImage(String path) async {
+    final form = FormData.fromMap({'image': await MultipartFile.fromFile(path)});
+    return str(obj((await client.post('/search/image', body: form))['data'])['upload']);
+  }
+
+  /// Search by photo, step two: the matches. [page] null is the first batch.
+  Future<ImageMatches> imageMatches(String upload, {int? page, String? sort}) async {
+    final r = await client.get('/search/image/$upload', query: {'page': page, 'sort': sort}, receiveTimeout: const Duration(seconds: 75));
+    final meta = obj(r['meta']);
+    return ImageMatches(
+      products: listOf(r['data'], ProductCard.fromJson),
+      nextPage: boolean(meta['has_more']) ? intOrNull(meta['next_page']) : null,
+    );
+  }
+
+  Future<(List<HomeVideo>, List<String>)> videos({String? category}) async {
+    final r = await client.get('/videos', query: {'category': category});
+    return (listOf(r['data'], HomeVideo.fromJson), [for (final c in (obj(r['meta'])['categories'] as List? ?? const [])) '$c']);
+  }
+
   Future<Json> price(int id, int quantity, {String? skuId}) async =>
       obj((await client.get('/products/$id/price', query: {'quantity': quantity, 'sku_id': skuId}))['data']);
 

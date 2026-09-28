@@ -13,12 +13,14 @@ import 'screens/cart_screen.dart';
 import 'screens/catalog_screens.dart';
 import 'screens/categories_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/image_search_screen.dart';
 import 'screens/listing_screen.dart';
 import 'screens/product_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/order_screens.dart';
 import 'screens/pay_screen.dart';
 import 'screens/support_screens.dart';
+import 'screens/videos_screen.dart';
 import '../state/wishlist.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -56,6 +58,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/search', parentNavigatorKey: _rootKey, builder: (_, s) => SearchScreen(initial: s.uri.queryParameters['q'])),
+      GoRoute(path: '/search/image', parentNavigatorKey: _rootKey, builder: (_, s) => ImageSearchScreen(path: s.extra as String?)),
+      GoRoute(path: '/videos', parentNavigatorKey: _rootKey, builder: (_, _) => const VideosScreen()),
       GoRoute(path: '/category/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(categoryId: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/product/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ProductScreen(id: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/orders', parentNavigatorKey: _rootKey, builder: (_, _) => const OrdersScreen()),
