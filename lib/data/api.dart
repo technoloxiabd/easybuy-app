@@ -104,7 +104,10 @@ class EasyBuyApi {
 
   // ---------------------------------------------------------- cart
 
-  Future<Cart> cart() async => Cart.fromJson(obj((await client.get('/cart'))['data']));
+  /// [visit]: the cart screen was opened, so the server clears the delivery
+  /// method when the shop wants it chosen every time, as the website's cart
+  /// page does. Background refreshes leave it alone.
+  Future<Cart> cart({bool visit = false}) async => Cart.fromJson(obj((await client.get('/cart', query: visit ? {'visit': 1} : null))['data']));
 
   Future<Cart> addToCart(int productId, {String? skuId, int? quantity, Map<String, int>? variants}) async {
     final body = <String, dynamic>{'product_id': productId};
@@ -272,6 +275,10 @@ class EasyBuyApi {
   }
 
   Future<void> undoMessage(int id) => client.delete('/messages/$id');
+
+  /// Left the chat: the server stops treating the customer as reading it,
+  /// so the next reply arrives as a notification.
+  Future<void> leaveChat() => client.post('/messages/away');
 
   Future<int> unreadMessages() async => integer(obj((await client.get('/messages/unread'))['data'])['unread']);
 

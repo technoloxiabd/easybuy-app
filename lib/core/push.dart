@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../data/api.dart';
 
@@ -20,10 +22,25 @@ class PushService {
   final _taps = StreamController<Map<String, dynamic>>.broadcast();
   final _foreground = StreamController<RemoteMessage>.broadcast();
 
+  /// Shows a message that arrives while the app is open in the notification
+  /// bar too. Android leaves that to the app (it only draws notifications
+  /// for an app in the background); iOS is told to via
+  /// setForegroundNotificationPresentationOptions instead.
+  final _local = FlutterLocalNotificationsPlugin();
+
+  /// The channel MainActivity creates and the server names in every push.
+  static const _channel = AndroidNotificationDetails(
+    'updates',
+    'Order and message updates',
+    channelDescription: 'Order status, payments and replies from EasyBuy',
+    importance: Importance.high,
+    priority: Priority.high,
+  );
+
   /// `data` of a notification the customer tapped: {type, order_number…}.
   Stream<Map<String, dynamic>> get taps => _taps.stream;
 
-  /// Messages that arrive while the app is open (no system banner then).
+  /// Messages that arrive while the app is open (also shown in the bar).
   Stream<RemoteMessage> get foreground => _foreground.stream;
 
   /// The Firebase app settings, passed at build time (Codemagic env vars ->
@@ -60,13 +77,43 @@ class PushService {
       return;
     }
 
-    FirebaseMessaging.onMessage.listen(_foreground.add);
+    if (Platform.isAndroid) {
+      await _local.initialize(
+        settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        // Tapping it goes where tapping a background push goes.
+        onDidReceiveNotificationResponse: (r) {
+          final payload = r.payload;
+          if (payload != null && payload.isNotEmpty) _taps.add(Map<String, dynamic>.from(jsonDecode(payload) as Map));
+        },
+      );
+    } else {
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(alert: true, badge: true, sound: true);
+    }
+
+    FirebaseMessaging.onMessage.listen((m) {
+      _foreground.add(m);
+      _showInBar(m);
+    });
     FirebaseMessaging.onMessageOpenedApp.listen((m) => _taps.add(m.data));
     final initial = await FirebaseMessaging.instance.getInitialMessage();
     if (initial != null) {
       // After the first frame, once the router is listening.
       Future.delayed(const Duration(milliseconds: 600), () => _taps.add(initial.data));
     }
+  }
+
+  void _showInBar(RemoteMessage m) {
+    final n = m.notification;
+    if (!Platform.isAndroid || n == null) return;
+    _local
+        .show(
+          id: m.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch ~/ 1000,
+          title: n.title,
+          body: n.body,
+          notificationDetails: const NotificationDetails(android: _channel),
+          payload: jsonEncode(m.data),
+        )
+        .ignore();
   }
 
   /// After sign-in: ask permission once, then tell the server this phone.

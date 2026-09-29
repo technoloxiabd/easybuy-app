@@ -120,7 +120,7 @@ class ShotApi extends EasyBuyApi {
       {'unit_price_bdt': live.detail.unitPrice, 'line_total_bdt': ((double.tryParse(live.detail.unitPrice) ?? 0) * quantity).toStringAsFixed(2)};
 
   @override
-  Future<Cart> cart() async => Cart(
+  Future<Cart> cart({bool visit = false}) async => Cart(
         items: [
           _line(p0, 1, 3, p0.unitPrice, (double.parse(p0.unitPrice) * 3).toStringAsFixed(2), colour: 'Red'),
           _line(p0, 2, 2, p0.unitPrice, (double.parse(p0.unitPrice) * 2).toStringAsFixed(2), colour: 'Blue'),

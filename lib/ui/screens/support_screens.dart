@@ -209,15 +209,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _api;
     _load();
-    // Until push is switched on, a gentle catch-up while the chat is open.
+    _startPolling();
+  }
+
+  /// A catch-up every 12 seconds while the chat is on screen. Each one tells
+  /// the server the customer is reading, which holds back the notification
+  /// for a reply -- so it stops the moment the chat is left or the app goes
+  /// to the background, and the server is told straight away.
+  void _startPolling() {
+    _poll?.cancel();
     _poll = Timer.periodic(const Duration(seconds: 12), (_) => _catchUp());
+  }
+
+  // Kept from initState: dispose() is too late to read providers.
+  late final _api = ref.read(apiProvider);
+
+  void _away() {
+    _poll?.cancel();
+    _poll = null;
+    _api.leaveChat().ignore();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _poll?.cancel();
+    _away();
     _text.dispose();
     _scroll.dispose();
     super.dispose();
@@ -225,7 +243,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _catchUp();
+    if (state == AppLifecycleState.resumed) {
+      _catchUp();
+      _startPolling();
+    } else if (state == AppLifecycleState.paused && _poll != null) {
+      _away();
+    }
   }
 
   Future<void> _load() async {

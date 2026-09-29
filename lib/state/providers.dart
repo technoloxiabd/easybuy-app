@@ -102,6 +102,9 @@ class CartNotifier extends AsyncNotifier<Cart> {
 
   Future<void> refresh() async => state = AsyncData(await _api.cart());
 
+  /// The cart screen came into view (see routerProvider).
+  Future<void> visit() async => state = AsyncData(await _api.cart(visit: true));
+
   Future<void> _apply(Future<Cart> Function() change) async => state = AsyncData(await change());
 
   Future<void> add(int productId, {String? skuId, int? quantity, Map<String, int>? variants}) =>

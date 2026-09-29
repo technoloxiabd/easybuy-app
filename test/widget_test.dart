@@ -44,7 +44,7 @@ class FakeApi extends EasyBuyApi {
   Future<List<Highlight>> highlights({int? category}) async => const [];
 
   @override
-  Future<Cart> cart() async => Cart.empty();
+  Future<Cart> cart({bool visit = false}) async => Cart.empty();
 }
 
 Widget app() => ProviderScope(

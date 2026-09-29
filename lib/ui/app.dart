@@ -94,6 +94,16 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   // Re-run the redirect when the customer signs in or out.
   ref.listen(authProvider, (_, _) => router.refresh());
+
+  // Arriving on the cart -- its tab, "View cart", or back from checkout --
+  // is a visit, as loading the website's cart page is: the delivery method
+  // is asked again when the shop wants it chosen every time.
+  var lastPath = '';
+  router.routerDelegate.addListener(() {
+    final path = router.routerDelegate.currentConfiguration.uri.path;
+    if (path == '/cart' && lastPath != '/cart') ref.read(cartProvider.notifier).visit().ignore();
+    lastPath = path;
+  });
   return router;
 });
 
@@ -125,16 +135,9 @@ class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
       final route = pushRoute(data);
       if (route != null) ref.read(routerProvider).push(route);
     }));
-    // In the foreground the system shows no banner; say it in the app.
-    _subs.add(push.foreground.listen((m) {
-      ref.invalidate(unreadMessagesProvider);
-      final route = pushRoute(m.data);
-      messengerKey.currentState?.showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text([m.notification?.title, m.notification?.body].whereType<String>().join(' — ')),
-        action: route == null ? null : SnackBarAction(label: 'View', onPressed: () => ref.read(routerProvider).push(route)),
-      ));
-    }));
+    // Open app: PushService puts it in the notification bar; bring the
+    // Messages count up to date at once.
+    _subs.add(push.foreground.listen((_) => ref.invalidate(unreadMessagesProvider)));
   }
 
   @override

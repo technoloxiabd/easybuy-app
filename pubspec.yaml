@@ -54,6 +54,7 @@ dependencies:
   pdfx: ^2.11.0
   flutter_file_dialog: ^3.3.3
   path_provider: ^2.1.6
+  flutter_local_notifications: ^22.3.1
 
 dev_dependencies:
   flutter_test:
