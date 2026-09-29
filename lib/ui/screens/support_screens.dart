@@ -190,6 +190,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   final _files = <String>[];
   final _scroll = ScrollController();
   Json? _manager;
+
+  /// The website chat's one-tap "📦 My order status?" buttons (server's call).
+  bool _statusPreset = false;
   bool _hasMore = false;
   bool _loading = true;
   bool _sending = false;
@@ -233,6 +236,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
           ..clear()
           ..addAll(list);
         _manager = objOrNull(meta['manager']);
+        _statusPreset = boolean(meta['status_preset']);
         _hasMore = boolean(meta['has_more']);
         _error = null;
       });
@@ -249,6 +253,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     try {
       final (list, meta) = await ref.read(apiProvider).messages(after: _lastId);
       final removed = (meta['removed'] as List?)?.map((e) => integer(e)).toSet() ?? const <int>{};
+      final preset = boolean(meta['status_preset']);
+      if (preset != _statusPreset) setState(() => _statusPreset = preset);
       if (list.isEmpty && removed.isEmpty) return;
       setState(() {
         _messages.removeWhere((m) => removed.contains(m.id));
@@ -300,6 +306,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
     }
   }
 
+  /// A tap on a quick reply, an order chip or a preset: sent as typed.
+  void _sendText(String text) {
+    _text.text = text;
+    _send();
+  }
+
   Future<void> _undo(ThreadMessage m) async {
     try {
       await ref.read(apiProvider).undoMessage(m.id);
@@ -313,18 +325,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   Widget build(BuildContext context) {
     final manager = _manager;
     return Scaffold(
-      appBar: AppBar(
-        title: Row(children: [
-          if (manager?['photo_url'] != null) ...[CircleAvatar(radius: 16, backgroundImage: NetworkImage('${manager!['photo_url']}')), const SizedBox(width: 10)],
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(manager?['name'] != null ? '${manager!['name']}' : 'EasyBuy support', style: const TextStyle(fontSize: 16)),
-              if (manager != null)
-                Text(manager['presence'] == 'online' ? 'Online' : 'Your relationship manager', style: const TextStyle(fontSize: 12, color: Colors.white70)),
-            ]),
-          ),
-        ]),
-      ),
+      appBar: AppBar(titleSpacing: 0, title: _ManagerHeader(manager: manager)),
       body: Column(children: [
         Expanded(
           child: _loading
@@ -355,7 +356,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
                                   if (ok == true) _undo(m);
                                 }
                               : null,
-                          child: _Bubble(message: m),
+                          child: _Bubble(message: m, onSend: _sendText),
                         );
                       },
                     ),
@@ -370,6 +371,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
               Expanded(child: Text(_aboutOrder != null ? 'About order $_aboutOrder' : 'About this product', style: const TextStyle(color: Brand.blue, fontSize: 13))),
               if (_aboutProduct != null) TextButton(onPressed: _sending ? null : () => _send(shareProduct: true), child: const Text('Send product')),
               IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() => _aboutOrder = _aboutProduct = null)),
+            ]),
+          ),
+        // Shown while an order is in flight; the status bot answers them.
+        if (_statusPreset)
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Color(0xFFF3F4F6)))),
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Wrap(spacing: 8, runSpacing: 8, children: [
+              _PresetPill(label: '📦 My order status?', onTap: _sending ? null : () => _sendText('Can you tell me my order status?')),
+              _PresetPill(label: '📦 অর্ডারের স্ট্যাটাস?', onTap: _sending ? null : () => _sendText('আপনি কি আমাকে আমার অর্ডারের স্ট্যাটাস জানাতে পারবেন?')),
             ]),
           ),
         if (_files.isNotEmpty)
@@ -421,9 +433,127 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
 
 // ------------------------------------------------------------------ pieces
 
+/// The website's chat header: the manager's photo (or initial) with a
+/// presence dot, the name with an Online / Idle / Offline badge, and what to
+/// expect underneath.
+class _ManagerHeader extends StatelessWidget {
+  const _ManagerHeader({required this.manager});
+  final Json? manager;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = manager;
+    final name = m?['name'] != null ? '${m!['name']}' : 'Your relationship manager';
+    final (dot, chipBg, chipFg, label) = switch (m?['presence']) {
+      'online' => (const Color(0xFF22C55E), const Color(0xFFF0FDF4), const Color(0xFF15803D), 'Online'),
+      'idle' => (const Color(0xFFFBBF24), const Color(0xFFFFFBEB), const Color(0xFFB45309), 'Idle'),
+      _ => (const Color(0xFFF87171), const Color(0xFFFEF2F2), const Color(0xFFDC2626), 'Offline'),
+    };
+    return Row(children: [
+      Stack(clipBehavior: Clip.none, children: [
+        m?['photo_url'] != null
+            ? CircleAvatar(radius: 20, backgroundColor: Colors.white, backgroundImage: NetworkImage('${m!['photo_url']}'))
+            : CircleAvatar(
+                radius: 20,
+                backgroundColor: Brand.blue,
+                child: Text(name.characters.first.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              ),
+        if (m != null)
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(width: 14, height: 14, decoration: BoxDecoration(color: dot, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 2))),
+          ),
+      ]),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+          Row(children: [
+            Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Brand.ink))),
+            if (m != null) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: chipBg, borderRadius: BorderRadius.circular(20)),
+                child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: chipFg)),
+              ),
+            ],
+          ]),
+          Text(
+            m != null ? 'Usually replies within a few hours' : 'Being assigned — send a message and we will pick it up',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w400, color: Color(0xFF6B7280)),
+          ),
+        ]),
+      ),
+    ]);
+  }
+}
+
+class _PresetPill extends StatelessWidget {
+  const _PresetPill({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.white,
+        shape: const StadiumBorder(side: BorderSide(color: Brand.blue, width: 1.5)),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Brand.blue)),
+          ),
+        ),
+      );
+}
+
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message});
+  const _Bubble({required this.message, this.onSend});
   final ThreadMessage message;
+
+  /// Sends a quick reply or an order number, as the website's chips do.
+  /// Null in a complaint thread, which has no bot and no chips.
+  final ValueChanged<String>? onSend;
+
+  static final _chips = RegExp(r'\[([^\[\]<>]{1,24})\]|\b([A-Z]{3}\d{6})\b');
+
+  /// The body with the website's buttons: [bracketed] quick replies in the
+  /// bot's messages, order numbers in any staff or bot message.
+  Widget _body(String body) {
+    final spans = <InlineSpan>[];
+    var at = 0;
+    for (final m in _chips.allMatches(body)) {
+      final quick = m[1];
+      final number = m[2];
+      if (quick != null && !message.isBot) continue;
+      spans.add(TextSpan(text: body.substring(at, m.start)));
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Material(
+            color: quick != null ? Brand.blue : const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => onSend!(quick ?? number!),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                child: Text(quick ?? number!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: quick != null ? Colors.white : Brand.blue)),
+              ),
+            ),
+          ),
+        ),
+      ));
+      at = m.end;
+    }
+    spans.add(TextSpan(text: body.substring(at)));
+    return Text.rich(TextSpan(children: spans), style: const TextStyle(color: Brand.ink, height: 1.35));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -455,7 +585,10 @@ class _Bubble extends StatelessWidget {
               onTap: () => context.push('/orders/${context_['order_number']}'),
               child: Text('Order ${context_['order_number']}', style: TextStyle(color: mine ? Colors.white : Brand.blue, fontWeight: FontWeight.w700, decoration: TextDecoration.underline)),
             ),
-          if (message.body != null) SelectableText(message.body!, style: TextStyle(color: mine ? Colors.white : Brand.ink, height: 1.35)),
+          if (message.body != null)
+            mine || onSend == null
+                ? SelectableText(message.body!, style: TextStyle(color: mine ? Colors.white : Brand.ink, height: 1.35))
+                : _body(message.body!),
           _FileChips(files: message.attachments, light: mine),
           const SizedBox(height: 4),
           Text(

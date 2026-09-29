@@ -143,10 +143,12 @@ class NetImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The website's .img-loading: its placeholder on white until the photo
+    // arrives, and in its place if the photo never does.
     final placeholder = Container(
-      color: Colors.grey.shade100,
+      color: Colors.white,
       alignment: Alignment.center,
-      child: Icon(Icons.image_outlined, color: Colors.grey.shade400),
+      child: Image.asset('assets/placeholder.png', fit: BoxFit.contain),
     );
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),

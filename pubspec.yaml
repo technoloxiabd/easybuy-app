@@ -51,6 +51,9 @@ dependencies:
   webview_flutter: ^4.14.1
   webview_flutter_android: ^4.14.1
   webview_flutter_wkwebview: ^3.26.1
+  pdfx: ^2.11.0
+  flutter_file_dialog: ^3.3.3
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -77,6 +80,9 @@ flutter:
 
   assets:
     - assets/logo.png
+    # The website's product-placeholder.svg (the ghosted bag and LOADING...),
+    # rendered to PNG: shown until a photo arrives, and if it never does.
+    - assets/placeholder.png
 
   # The website's Bengali face (SIL Open Font License). Used as a FALLBACK:
   # Latin stays the platform font, while ৳ and Bengali text render the way

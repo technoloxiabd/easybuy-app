@@ -264,8 +264,10 @@ class ShotApi extends EasyBuyApi {
           ThreadMessage(id: 1, mine: true, body: 'When will order SEP214087 reach Dhaka?', attachments: const [], canUndo: false, createdAt: DateTime(2026, 9, 25, 10, 2)),
           ThreadMessage(id: 2, mine: false, author: 'EasyBuy bot', body: 'Order SEP214087 is Shipped from China. It usually reaches Dhaka in 7–12 days.', attachments: const [], canUndo: false, createdAt: DateTime(2026, 9, 25, 10, 2)),
           ThreadMessage(id: 3, mine: false, author: 'Nabila', body: 'It landed this morning — ready for delivery. The rider will call you.', attachments: const [], canUndo: false, createdAt: DateTime(2026, 9, 26, 10, 11)),
+          ThreadMessage(id: 4, mine: true, body: 'Can you tell me my order status?', attachments: const [], canUndo: false, createdAt: DateTime(2026, 9, 29, 9, 35)),
+          ThreadMessage(id: 5, mine: false, isBot: true, body: '🤖 Automatic update: কোন ভাষায় উত্তর পেতে চান? / In which language would you like the reply?\n[English] [বাংলা]', attachments: const [], canUndo: false, createdAt: DateTime(2026, 9, 29, 9, 35)),
         ],
-        <String, dynamic>{'manager': {'name': 'Nabila', 'presence': 'online'}, 'removed': [], 'has_more': false},
+        <String, dynamic>{'manager': {'name': 'Nabila', 'presence': 'online'}, 'removed': [], 'has_more': false, 'status_preset': true},
       );
 }
 
@@ -443,6 +445,12 @@ void main() {
     router.push('/category/12697');
     await settle();
     await shot('19_category_tabs');
+    router.pop();
+    await settle();
+
+    router.push('/chat');
+    await settle();
+    await shot('21_chat');
     router.pop();
     await settle();
 

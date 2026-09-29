@@ -866,9 +866,12 @@ class ComplaintSummary {
 }
 
 class ThreadMessage {
-  ThreadMessage({required this.id, required this.mine, this.author, this.body, required this.attachments, this.context, required this.canUndo, this.createdAt});
+  ThreadMessage({required this.id, required this.mine, this.author, this.body, required this.attachments, this.context, required this.canUndo, this.createdAt, this.isBot = false});
   final int id;
   final bool mine;
+
+  /// The order-status bot's own message: its [bracketed] choices are buttons.
+  final bool isBot;
   final String? author;
   final String? body;
   final List<FileLink> attachments;
@@ -884,6 +887,7 @@ class ThreadMessage {
         context: objOrNull(j['context']),
         canUndo: boolean(j['can_undo']),
         createdAt: date(j['created_at']),
+        isBot: boolean(j['is_bot']),
       );
 }
 

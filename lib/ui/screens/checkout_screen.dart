@@ -11,6 +11,7 @@ import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/site.dart';
+import '../widgets/tab_bar.dart';
 import 'cart_screen.dart';
 import 'order_screens.dart' show openExternal, pickFiles;
 
@@ -165,6 +166,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final c = _checkout;
     return Scaffold(
       appBar: const SiteHeader(),
+      // The website keeps its tab bar on checkout; no tab is lit there.
+      bottomNavigationBar: const PageTabBar(current: null),
       body: c == null
           ? (_error != null ? ErrorView(error: _error!, onRetry: _load) : const LoadingView())
           : Stack(children: [

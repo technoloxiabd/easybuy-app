@@ -12,6 +12,7 @@ import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/pickers.dart';
+import 'invoice_screen.dart';
 
 final _when = DateFormat('d MMM yyyy, h:mm a');
 
@@ -253,14 +254,8 @@ class _OrderBody extends ConsumerWidget {
           _BalanceBanner(statement: st),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () async {
-              try {
-                final url = await ref.read(apiProvider).invoiceUrl(s.number);
-                if (context.mounted) await openExternal(context, url);
-              } catch (e) {
-                if (context.mounted) showError(context, e);
-              }
-            },
+            // In the app, with Download -- no longer the browser.
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => InvoiceScreen(number: s.number))),
             icon: const Icon(Icons.picture_as_pdf_outlined),
             label: const Text('Invoice (PDF)'),
           ),
