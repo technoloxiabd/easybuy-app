@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../core/config.dart';
 import '../core/push.dart';
 import '../core/theme.dart';
+import '../data/models.dart';
 import '../state/providers.dart';
 import 'screens/account_screens.dart';
 import 'screens/article_screen.dart';
@@ -23,6 +24,7 @@ import 'screens/order_screens.dart';
 import 'screens/pay_screen.dart';
 import 'screens/support_screens.dart';
 import 'screens/videos_screen.dart';
+import 'widgets/chat_fab.dart';
 import 'widgets/tab_bar.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
@@ -67,7 +69,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // An article or the blog list, from its website URL.
       GoRoute(path: '/blog', parentNavigatorKey: _rootKey, builder: (_, s) => ArticleScreen(url: s.uri.queryParameters['url'] ?? '${AppConfig.siteBase}/blog')),
       GoRoute(path: '/category/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(categoryId: int.parse(s.pathParameters['id']!))),
-      GoRoute(path: '/product/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ProductScreen(id: int.parse(s.pathParameters['id']!))),
+      GoRoute(path: '/product/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ProductScreen(id: int.parse(s.pathParameters['id']!), preview: s.extra is ProductCard ? s.extra as ProductCard : null)),
       GoRoute(path: '/orders', parentNavigatorKey: _rootKey, builder: (_, _) => const OrdersScreen()),
       GoRoute(path: '/checkout', parentNavigatorKey: _rootKey, builder: (_, _) => const CheckoutScreen()),
       GoRoute(path: '/orders/:number', parentNavigatorKey: _rootKey, builder: (_, s) => OrderScreen(number: s.pathParameters['number']!)),
@@ -159,6 +161,8 @@ class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
         theme: buildTheme(),
         scaffoldMessengerKey: messengerKey,
         routerConfig: ref.watch(routerProvider),
+        // The floating chat button rides over every screen.
+        builder: (context, child) => Stack(children: [child!, const ChatFab()]),
       );
 }
 

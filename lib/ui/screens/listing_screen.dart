@@ -282,7 +282,7 @@ class _RecommendedState extends ConsumerState<_Recommended> {
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    onTap: () => context.push('/product/${p.id}'),
+                    onTap: () => context.push('/product/${p.id}', extra: p),
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE5E7EB))),

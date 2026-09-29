@@ -16,7 +16,9 @@ class ApiClient {
       : dio = dio ??
             Dio(BaseOptions(
               baseUrl: AppConfig.apiBase,
-              connectTimeout: const Duration(seconds: 15),
+              // A connection that has not opened in 8 seconds is not coming:
+              // say "No connection" rather than keep the spinner going.
+              connectTimeout: const Duration(seconds: 8),
               receiveTimeout: const Duration(seconds: 30),
               headers: {'Accept': 'application/json'},
             )) {

@@ -257,6 +257,8 @@ class ShotApi extends EasyBuyApi {
 
   @override
   Future<int> unreadMessages() async => 1;
+  @override
+  Future<void> leaveChat() async {}
 
   @override
   Future<(List<ThreadMessage>, Json)> messages({int? after, int? before}) async => (

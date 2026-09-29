@@ -421,3 +421,67 @@ class _BusyButtonState extends State<BusyButton> {
         : FilledButton(style: style, onPressed: onPressed, child: child);
   }
 }
+
+/// A grey placeholder block for a loading page; [Shimmer] makes it glint.
+class Bone extends StatelessWidget {
+  const Bone({super.key, this.width, this.height, this.radius = 6});
+  final double? width;
+  final double? height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(color: const Color(0xFFE5E7EB), borderRadius: BorderRadius.circular(radius)),
+      );
+}
+
+/// A light sweeping across its child: the "still loading" glint over
+/// [Bone]s. Plain Flutter, no package; honours reduced motion.
+class Shimmer extends StatefulWidget {
+  const Shimmer({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
+  late final _sweep = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.of(context).disableAnimations) {
+      _sweep.stop();
+    } else if (!_sweep.isAnimating) {
+      _sweep.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sweep.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _sweep,
+        child: widget.child,
+        builder: (context, child) => ShaderMask(
+          // srcATop: only the placeholders' own pixels catch the light.
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) {
+            final x = -1.0 + 3.0 * _sweep.value;
+            return LinearGradient(
+              begin: Alignment(x - 1, -0.3),
+              end: Alignment(x, 0.3),
+              colors: const [Color(0x00FFFFFF), Color(0x80FFFFFF), Color(0x00FFFFFF)],
+            ).createShader(bounds);
+          },
+          child: child,
+        ),
+      );
+}

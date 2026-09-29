@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/config.dart';
 import '../../core/theme.dart';
 import '../../data/json.dart';
 import '../../data/models.dart';
@@ -391,7 +392,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
             child: Row(children: [
               const Icon(Icons.link, size: 16, color: Brand.blue),
               const SizedBox(width: 6),
-              Expanded(child: Text(_aboutOrder != null ? 'About order $_aboutOrder' : 'About this product', style: const TextStyle(color: Brand.blue, fontSize: 13))),
+              // The product's short link, so it is clear which one is meant.
+              Expanded(
+                child: Text(
+                  _aboutOrder != null ? 'About order $_aboutOrder' : 'About this product · ${Uri.parse(AppConfig.siteBase).host}/p/$_aboutProduct',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Brand.blue, fontSize: 13),
+                ),
+              ),
               if (_aboutProduct != null) TextButton(onPressed: _sending ? null : () => _send(shareProduct: true), child: const Text('Send product')),
               IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () => setState(() => _aboutOrder = _aboutProduct = null)),
             ]),

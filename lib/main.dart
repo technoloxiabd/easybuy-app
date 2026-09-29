@@ -17,6 +17,13 @@ Future<void> main() async {
   await PushService.instance.init();
 
   runApp(ProviderScope(
+    /*
+     * No automatic retries. Riverpod retries a failed load up to 10 times,
+     * showing the spinner all the while -- with no internet the home page
+     * and category menu spun for half a minute (owner, 29 Sep 2026). A
+     * failure now shows at once, with "No connection" and a Try again.
+     */
+    retry: (_, _) => null,
     overrides: [sessionStoreProvider.overrideWithValue(session)],
     child: const EasyBuyApp(),
   ));

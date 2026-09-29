@@ -1,3 +1,4 @@
+import '../core/text.dart';
 import 'json.dart';
 
 // ---------------------------------------------------------------- account
@@ -94,7 +95,7 @@ class ProductCard {
     final campaign = objOrNull(j['campaign']);
     return ProductCard(
       id: integer(j['id']),
-      title: str(j['title']),
+      title: titleCase(str(j['title'])),
       imageUrl: strOrNull(j['image_url']),
       unitPrice: str(j['unit_price_bdt'], '0'),
       minQuantity: integer(j['min_quantity'], 1),
@@ -161,11 +162,14 @@ class PriceTier {
 }
 
 class ProductDetail {
-  ProductDetail({required this.id, required this.title, required this.images, required this.unitPrice, required this.minQuantity, required this.minQuantityIsSupplier, required this.priceTiers, required this.variants, required this.variantsPricedSeparately, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.estimatedWeightKg, this.slug, this.repurchaseRate, this.isSuperFactory = false, this.categoryId, this.categoryName, this.ordersCount = 0, this.onPricingHold = false, this.videoUrl, this.campaignLabel, this.minOrderAmount, this.orderNote, this.specs = const [], this.descriptionImages, this.seller, this.shippingTitle = 'Shipping charges', this.shipping = const [], this.orderRules = const OrderRules()});
+  ProductDetail({required this.id, required this.title, required this.images, required this.unitPrice, required this.minQuantity, required this.minQuantityIsSupplier, required this.priceTiers, required this.variants, required this.variantsPricedSeparately, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.estimatedWeightKg, this.slug, this.shareUrl, this.repurchaseRate, this.isSuperFactory = false, this.categoryId, this.categoryName, this.ordersCount = 0, this.onPricingHold = false, this.videoUrl, this.campaignLabel, this.minOrderAmount, this.orderNote, this.specs = const [], this.descriptionImages, this.seller, this.shippingTitle = 'Shipping charges', this.shipping = const [], this.orderRules = const OrderRules()});
 
   final int id;
   final String title;
   final String? slug;
+
+  /// The short /p/{id} link the website's copy and share buttons hand out.
+  final String? shareUrl;
   final List<String> images;
   final String unitPrice;
   final int minQuantity;
@@ -208,8 +212,9 @@ class ProductDetail {
 
   factory ProductDetail.fromJson(Json j) => ProductDetail(
         id: integer(j['id']),
-        title: str(j['title']),
+        title: titleCase(str(j['title'])),
         slug: strOrNull(j['slug']),
+        shareUrl: strOrNull(j['share_url']),
         images: j['images'] is List ? (j['images'] as List).map((e) => '$e').toList() : const [],
         unitPrice: str(j['unit_price_bdt'], '0'),
         minQuantity: integer(j['min_quantity'], 1),
@@ -457,7 +462,7 @@ class CartItem {
         id: integer(j['id']),
         productId: integer(j['product_id']),
         skuId: strOrNull(j['sku_id']),
-        title: str(j['title']),
+        title: titleCase(str(j['title'])),
         imageUrl: strOrNull(j['image_url']),
         attributes: listOf(j['attributes'], Attribute.fromJson),
         quantity: integer(j['quantity'], 1),
@@ -742,7 +747,7 @@ class OrderItemGroup {
   final List<OrderLine> lines;
   factory OrderItemGroup.fromJson(Json j) => OrderItemGroup(
         productId: intOrNull(j['product_id']),
-        title: str(j['title']),
+        title: titleCase(str(j['title'])),
         imageUrl: strOrNull(j['image_url']),
         quantity: integer(j['quantity']),
         total: str(j['total_bdt'], '0'),

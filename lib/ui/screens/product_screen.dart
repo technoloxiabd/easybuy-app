@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/config.dart';
 import '../../core/money.dart';
@@ -21,15 +23,22 @@ final productProvider = FutureProvider.autoDispose.family<ProductDetail, int>((r
 final relatedProvider = FutureProvider.autoDispose.family<List<ProductCard>, int>((ref, id) => ref.read(apiProvider).related(id));
 
 /// The website's product page (catalog/show.blade.php), section for section.
+///
+/// Opens at once (owner, 29 Sep 2026): while the product loads, the page is
+/// already there with what the tapped card knew -- photo, name, price --
+/// and shimmering placeholders for the rest (see [ProductSkeleton]).
 class ProductScreen extends ConsumerWidget {
-  const ProductScreen({super.key, required this.id});
+  const ProductScreen({super.key, required this.id, this.preview});
   final int id;
+
+  /// The card that was tapped, when there was one.
+  final ProductCard? preview;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(productProvider(id));
     return async.when(
-      loading: () => const Scaffold(appBar: SiteHeader(), body: LoadingView()),
+      loading: () => ProductSkeleton(preview: preview),
       error: (e, _) => Scaffold(appBar: const SiteHeader(), body: ErrorView(error: e, onRetry: () => ref.invalidate(productProvider(id)))),
       data: (p) => _ProductPage(product: p),
     );
@@ -279,6 +288,8 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
 
   // ---------------------------------------------------------------- title
 
+  String get _shareUrl => p.shareUrl ?? '${AppConfig.siteBase}/p/${p.id}';
+
   Widget _titleCard() {
     final saved = ref.watch(wishlistProvider).any((x) => x.id == p.id);
     return WebCard(
@@ -294,7 +305,7 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
             ),
           ),
           const SizedBox(width: 14),
-          Expanded(child: Text(p.title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, height: 1.3, letterSpacing: -0.2))),
+          Expanded(child: Text(p.title, style: productTitleStyle)),
         ]),
         if (p.categoryName != null) ...[
           const SizedBox(height: 12),
@@ -330,16 +341,27 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
             },
           ),
           const SizedBox(width: 6),
+          // The website's short /p/{id} link, for copying and sharing alike.
           _SquareAction(
             icon: Icons.copy_rounded,
             tooltip: 'Copy link',
             onTap: () async {
-              await Clipboard.setData(ClipboardData(text: '${AppConfig.siteBase}/products/${p.slug ?? p.id}'));
+              await Clipboard.setData(ClipboardData(text: _shareUrl));
               if (mounted) showMessage(context, 'Link copied');
             },
           ),
           const SizedBox(width: 6),
-          _SquareAction(icon: Icons.chat_bubble_rounded, color: Colors.white, background: const Color(0xFF16C75E), tooltip: 'Ask about this product', onTap: () => context.push('/chat?product=${p.id}')),
+          // Share on WhatsApp, as the website's green button does. Chat with
+          // the manager is the floating button (ChatFab), on every screen.
+          _SquareAction(
+            iconWidget: SvgPicture.string(_whatsAppLogo, width: 19, height: 19, colorFilter: const ColorFilter.mode(Colors.white, BlendMode.srcIn)),
+            background: const Color(0xFF22C55E),
+            tooltip: 'Share on WhatsApp',
+            onTap: () => launchUrl(
+              Uri.parse('https://wa.me/?text=${Uri.encodeComponent('${p.title} $_shareUrl')}'),
+              mode: LaunchMode.externalApplication,
+            ),
+          ),
         ]),
       ]),
     );
@@ -744,8 +766,9 @@ class _Pill extends StatelessWidget {
 }
 
 class _SquareAction extends StatelessWidget {
-  const _SquareAction({required this.icon, required this.onTap, required this.tooltip, this.color = const Color(0xFF374151), this.background = const Color(0xFFF3F4F6)});
-  final IconData icon;
+  const _SquareAction({this.icon, this.iconWidget, required this.onTap, required this.tooltip, this.color = const Color(0xFF374151), this.background = const Color(0xFFF3F4F6)});
+  final IconData? icon;
+  final Widget? iconWidget;
   final VoidCallback onTap;
   final String tooltip;
   final Color color;
@@ -760,7 +783,7 @@ class _SquareAction extends StatelessWidget {
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: onTap,
-            child: SizedBox(width: 36, height: 36, child: Icon(icon, size: 19, color: color)),
+            child: SizedBox(width: 36, height: 36, child: Center(child: iconWidget ?? Icon(icon, size: 19, color: color))),
           ),
         ),
       );
@@ -1166,5 +1189,79 @@ class _InfoTabsState extends ConsumerState<_InfoTabs> {
         Attribute('Units sold (this product)', compactCount(widget.product.saleCount)),
       ]),
     ]);
+  }
+}
+
+/// The product name on its page: the website's 17px bold, a step down from
+/// the heavier 19px it used to be.
+const productTitleStyle = TextStyle(fontSize: 16.5, fontWeight: FontWeight.w700, height: 1.35);
+
+/// The website's WhatsApp glyph (catalog/show.blade.php).
+const _whatsAppLogo = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" fill-rule="evenodd" d="M17.5 14.4c-.3-.2-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.7 1-.9 1.2-.2.2-.3.2-.6.1-1.6-.8-2.7-1.5-3.7-3.3-.3-.5.3-.5.8-1.5.1-.2 0-.4 0-.5s-.7-1.6-.9-2.2c-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.4 1.9.8 2.6.9 3.5.7.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3M12 2a10 10 0 00-8.6 15L2 22l5.1-1.3A10 10 0 1012 2z"/></svg>';
+
+/// The product page while it loads: the same cards in the same places, with
+/// what the tapped card already knew filled in and a soft shimmer where the
+/// rest will land -- so the tap answers at once, and nothing jumps when the
+/// details arrive.
+class ProductSkeleton extends StatelessWidget {
+  const ProductSkeleton({super.key, this.preview});
+  final ProductCard? preview;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = preview;
+    return Scaffold(
+      appBar: const SiteHeader(),
+      body: Shimmer(
+        child: ListView(physics: const NeverScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
+          WebCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Material(
+                  color: const Color(0xFFF3F4F6),
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => context.canPop() ? context.pop() : context.go('/'),
+                    child: const SizedBox(width: 44, height: 44, child: Icon(Icons.chevron_left, size: 28)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: card != null
+                      ? Text(card.title, style: productTitleStyle)
+                      : const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Bone(height: 16), SizedBox(height: 8), Bone(height: 16, width: 180)]),
+                ),
+              ]),
+              const SizedBox(height: 14),
+              const Row(children: [Bone(height: 34, width: 130, radius: 20), Spacer(), Bone(height: 36, width: 36, radius: 10), SizedBox(width: 6), Bone(height: 36, width: 36, radius: 10), SizedBox(width: 6), Bone(height: 36, width: 36, radius: 10)]),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          WebCard(
+            padding: const EdgeInsets.all(12),
+            child: AspectRatio(
+              aspectRatio: 1,
+              child: card?.imageUrl != null ? NetImage(card!.imageUrl, radius: 12) : const Bone(radius: 12),
+            ),
+          ),
+          const SizedBox(height: 16),
+          WebCard(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (card != null && !card.onPricingHold)
+                Text('${card.priceFrom ? 'from ' : ''}${Money.bdt(card.unitPrice)}', style: const TextStyle(color: Brand.orange, fontSize: 24, fontWeight: FontWeight.w800))
+              else
+                const Bone(height: 26, width: 120),
+              const SizedBox(height: 14),
+              const Bone(height: 14),
+              const SizedBox(height: 10),
+              const Bone(height: 14, width: 220),
+              const SizedBox(height: 18),
+              const Row(children: [Bone(height: 64, width: 64, radius: 10), SizedBox(width: 8), Bone(height: 64, width: 64, radius: 10), SizedBox(width: 8), Bone(height: 64, width: 64, radius: 10)]),
+            ]),
+          ),
+        ]),
+      ),
+    );
   }
 }

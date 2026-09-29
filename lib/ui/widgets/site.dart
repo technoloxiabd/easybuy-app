@@ -176,7 +176,7 @@ class WebProductCard extends StatelessWidget {
       elevation: 0.6,
       shadowColor: const Color(0x22000000),
       child: InkWell(
-        onTap: () => context.push('/product/${p.id}'),
+        onTap: () => context.push('/product/${p.id}', extra: p),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           AspectRatio(
             aspectRatio: 1,
