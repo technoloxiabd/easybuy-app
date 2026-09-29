@@ -168,6 +168,13 @@ class VideoPlayerScreen extends StatelessWidget {
 /// autoplay in a browser always starts muted). Links out of the player
 /// (the YouTube logo, "watch on Facebook") open in the browser rather than
 /// replacing the player.
+///
+/// Facebook mutes its own plugin whenever it is told to autoplay, whatever
+/// the app allows (owner, 29 Sep 2026: Facebook played silent, YouTube with
+/// sound). So a Facebook video uses Facebook's SDK player, as the website's
+/// watch page does on a computer, and is unmuted and started from script.
+/// If the SDK does not load within 4 seconds, the plain plugin is shown
+/// WITHOUT autoplay: one tap on Facebook's play button, and it has sound.
 class EmbedPlayer extends StatefulWidget {
   const EmbedPlayer({super.key, required this.embedUrl, required this.width});
   final String embedUrl;
@@ -180,13 +187,45 @@ class EmbedPlayer extends StatefulWidget {
 class _EmbedPlayerState extends State<EmbedPlayer> {
   late final WebViewController _web;
 
+  Uri get _uri => Uri.parse(widget.embedUrl);
+
+  bool get _isFacebook => _uri.host.contains('facebook.com');
+
   String get _src {
-    final uri = Uri.parse(widget.embedUrl);
-    // Facebook's plugin draws a 500px player unless told the width.
-    if (uri.host.contains('facebook.com')) {
-      return uri.replace(queryParameters: {...uri.queryParameters, 'width': '${widget.width.round()}'}).toString();
+    final uri = _uri;
+    // Facebook's plugin draws a 500px player unless told the width, and
+    // autoplays muted -- so it waits for the tap on its own play button.
+    if (_isFacebook) {
+      return uri.replace(queryParameters: {...uri.queryParameters, 'width': '${widget.width.round()}', 'autoplay': 'false'}).toString();
     }
     return widget.embedUrl;
+  }
+
+  static const _frameStyle = '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}'
+      'iframe{position:fixed;inset:0;width:100%;height:100%;border:0}'
+      '.fb{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}</style>';
+
+  String _iframe(String src) => '<iframe src="$src" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>';
+
+  /// Facebook's SDK player, unmuted and started as soon as it is ready.
+  String _facebookPage() {
+    const esc = HtmlEscape();
+    final href = esc.convert(_uri.queryParameters['href'] ?? '');
+    final fallback = jsonEncode(_iframe(esc.convert(_src)));
+    return '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">$_frameStyle</head><body>'
+        '<div id="fb-root"></div>'
+        '<div class="fb"><div class="fb-video" data-href="$href" data-width="${widget.width.round()}" data-autoplay="false"'
+        ' data-show-text="false" data-allowfullscreen="true"></div></div>'
+        '<script>'
+        'var settled=false;'
+        'function plain(){if(settled)return;settled=true;document.body.innerHTML=$fallback;}'
+        'var giveUp=setTimeout(plain,4000);'
+        'window.fbAsyncInit=function(){FB.init({xfbml:true,version:"v21.0"});'
+        'FB.Event.subscribe("xfbml.ready",function(m){if(m.type!=="video"||settled)return;settled=true;clearTimeout(giveUp);'
+        'var p=m.instance;try{p.unmute();}catch(e){}try{p.play();}catch(e){}});};'
+        '</script>'
+        '<script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js" onerror="plain()"></script>'
+        '</body></html>';
   }
 
   @override
@@ -213,10 +252,10 @@ class _EmbedPlayerState extends State<EmbedPlayer> {
         },
       ))
       ..loadHtmlString(
-        '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}'
-        'iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>'
-        '<body><iframe src="$src" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></body></html>',
+        _isFacebook
+            ? _facebookPage()
+            : '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">$_frameStyle</head>'
+                '<body>${_iframe(src)}</body></html>',
         baseUrl: '${AppConfig.siteBase}/',
       );
   }

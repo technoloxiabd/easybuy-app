@@ -10,7 +10,7 @@ import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/site.dart';
 import '../widgets/video.dart';
-import 'order_screens.dart' show openExternal;
+import 'article_screen.dart' show openSiteLink;
 
 final homeProvider = FutureProvider<HomeData>((ref) => ref.read(apiProvider).home());
 
@@ -25,7 +25,7 @@ void openLink(BuildContext context, LinkTarget? link) {
     case 'shop':
       context.go('/shop');
     default:
-      if (link.url.isNotEmpty) openExternal(context, link.url);
+      if (link.url.isNotEmpty) openSiteLink(context, link.url);
   }
 }
 
@@ -376,7 +376,7 @@ class _BlogBand extends StatelessWidget {
               KickerHeader(
                 title: '${heading['title'] ?? 'Learn before you buy'}',
                 subtitle: heading['subtitle'] == null ? null : '${heading['subtitle']}',
-                onViewAll: () => context.push('/videos'),
+                onViewAll: () => context.push('/blog'),
               ),
             ]),
           ),
@@ -397,7 +397,7 @@ class _BlogBand extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => openExternal(context, p.url),
+                      onTap: () => openSiteLink(context, p.url),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         AspectRatio(aspectRatio: 16 / 9, child: NetImage(p.coverUrl, radius: 0)),
                         Padding(

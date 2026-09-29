@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/config.dart';
 import '../core/push.dart';
 import '../core/theme.dart';
 import '../state/providers.dart';
 import 'screens/account_screens.dart';
+import 'screens/article_screen.dart';
 import 'screens/auth_screens.dart';
 import 'screens/cart_screen.dart';
 import 'screens/catalog_screens.dart';
@@ -62,6 +64,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/search/results', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(query: s.uri.queryParameters['q'])),
       GoRoute(path: '/search/image', parentNavigatorKey: _rootKey, builder: (_, s) => ImageSearchScreen(path: s.extra as String?)),
       GoRoute(path: '/videos', parentNavigatorKey: _rootKey, builder: (_, _) => const VideosScreen()),
+      // An article or the blog list, from its website URL.
+      GoRoute(path: '/blog', parentNavigatorKey: _rootKey, builder: (_, s) => ArticleScreen(url: s.uri.queryParameters['url'] ?? '${AppConfig.siteBase}/blog')),
       GoRoute(path: '/category/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(categoryId: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/product/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ProductScreen(id: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/orders', parentNavigatorKey: _rootKey, builder: (_, _) => const OrdersScreen()),
