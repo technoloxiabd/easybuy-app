@@ -363,7 +363,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           const SizedBox(height: 10),
           TextField(controller: _phone, keyboardType: TextInputType.phone, decoration: InputDecoration(labelText: 'Mobile number', hintText: '01XXXXXXXXX', errorText: err?.fieldError('phone'))),
           const SizedBox(height: 10),
-          TextField(controller: _address, maxLines: 3, decoration: InputDecoration(labelText: 'Full address', errorText: err?.fieldError('address'))),
+          TextField(
+            controller: _address,
+            maxLines: 3,
+            decoration: InputDecoration(
+              labelText: c.addressRequired ? 'Full address' : 'Full address (optional)',
+              // Collecting from the warehouse, as the website says it.
+              helperText: c.addressRequired ? null : "You'll collect this order from our warehouse, so an address isn't needed.",
+              helperMaxLines: 2,
+              errorText: err?.fieldError('address'),
+            ),
+          ),
           Material(
             type: MaterialType.transparency,
             child: CheckboxListTile(

@@ -586,7 +586,7 @@ class DeliveryMethod {
 }
 
 class Checkout {
-  Checkout({required this.lines, required this.itemCount, required this.goodsTotal, this.campaign, this.coupon, required this.netGoods, required this.dueNow, required this.dueLater, this.advancePercent, required this.creditBalance, this.shippingMethod, required this.shippingMethods, this.deliveryMethod, required this.deliveryChoiceRequired, required this.deliveryMethods, required this.addresses, this.defaultAddressId, this.termsTitle, this.termsHtml, required this.blockers, required this.canPlace, this.paymentMethods = const [], this.paymentMethodRequired = false});
+  Checkout({required this.lines, required this.itemCount, required this.goodsTotal, this.campaign, this.coupon, required this.netGoods, required this.dueNow, required this.dueLater, this.advancePercent, required this.creditBalance, this.shippingMethod, required this.shippingMethods, this.deliveryMethod, required this.deliveryChoiceRequired, required this.deliveryMethods, required this.addresses, this.defaultAddressId, this.addressRequired = true, this.termsTitle, this.termsHtml, required this.blockers, required this.canPlace, this.paymentMethods = const [], this.paymentMethodRequired = false});
 
   /// Chosen before placing, as on the website's checkout.
   final List<PayMethod> paymentMethods;
@@ -609,6 +609,9 @@ class Checkout {
   final List<DeliveryMethod> deliveryMethods;
   final List<Address> addresses;
   final int? defaultAddressId;
+
+  /// False when collecting from the warehouse: the address is optional.
+  final bool addressRequired;
   final String? termsTitle;
   final String? termsHtml;
   final List<Notice> blockers;
@@ -636,6 +639,7 @@ class Checkout {
       deliveryMethods: listOf(j['delivery_methods'], DeliveryMethod.fromJson),
       addresses: listOf(j['addresses'], Address.fromJson),
       defaultAddressId: intOrNull(j['default_address_id']),
+      addressRequired: j['address_required'] != false,
       termsTitle: terms == null ? null : str(terms['title']),
       termsHtml: terms == null ? null : str(terms['html']),
       blockers: listOf(j['blockers'], Notice.fromJson),
