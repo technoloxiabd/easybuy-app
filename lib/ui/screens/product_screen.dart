@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/api_error.dart';
 import '../../core/config.dart';
 import '../../core/money.dart';
 import '../../core/theme.dart';
@@ -97,7 +96,10 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
     setState(() {});
     _debounce?.cancel();
     final pieces = _pieces;
-    if (pieces < p.minQuantity) {
+    // Priced from the first piece, as the website's running total is: the
+    // minimum-amount hint and the advance box need the figure below the
+    // minimum too.
+    if (pieces == 0) {
       setState(() => _lineTotal = null);
       return;
     }
@@ -134,9 +136,111 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
     return sum.toStringAsFixed(2);
   }
 
+  // ---------------------------------------------------------------- the gate
+
+  OrderRules get _rules => p.orderRules;
+
+  /// The selection's total in taka: the server's figure when it is current,
+  /// otherwise the rows' own prices (the page's running total does the same).
+  double get _total {
+    if (_lineTotal != null) return double.tryParse(_lineTotal!) ?? 0;
+    if (_hasOptions) {
+      return _qty.entries.fold(0.0, (sum, e) {
+        final v = p.variants.where((v) => v.skuId == e.key).firstOrNull;
+        return sum + (double.tryParse(p.variantsPricedSeparately ? (v?.unitPrice ?? p.unitPrice) : p.unitPrice) ?? 0) * e.value;
+      });
+    }
+    return (double.tryParse(p.unitPrice) ?? 0) * _single;
+  }
+
+  double get _minAmount => double.tryParse(p.minOrderAmount ?? '') ?? 0;
+
+  /// A selection worth the cap or more clears the store's floors on its own
+  /// -- but never the supplier's.
+  bool get _highValue => (_rules.highValueCap ?? 0) > 0 && _pieces > 0 && _total >= _rules.highValueCap!;
+  int get _floor => _highValue ? _rules.supplierMinQuantity : p.minQuantity;
+  bool get _qtyShort => _pieces > 0 && _pieces < _floor;
+  bool get _amountShort => !_highValue && _minAmount > 0 && _pieces > 0 && _total < _minAmount;
+
+  /// "Almost there": the website's buy-block modal, word for word.
+  Future<void> _almostThere(List<InlineSpan> message) => showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          content: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const CircleAvatar(radius: 20, backgroundColor: Color(0xFFFEF3C7), child: Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706))),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                const Text('Almost there', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Brand.ink)),
+                const SizedBox(height: 6),
+                Text.rich(TextSpan(children: message), style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF4B5563))),
+              ]),
+            ),
+          ]),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Brand.blue),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK, got it'),
+              ),
+            ),
+          ],
+        ),
+      );
+
+  static const _bold = TextStyle(fontWeight: FontWeight.w800, color: Brand.ink);
+
+  /// PICK_OPTIONS_MSG: choose options first, and the floors that apply.
+  List<InlineSpan> _pickMessage() {
+    final floors = <List<InlineSpan>>[
+      if (p.minQuantity > 1) [const TextSpan(text: 'সর্বনিম্ন '), TextSpan(text: '${Money.bn(p.minQuantity)} টি', style: _bold)],
+      if (_minAmount > 0) [const TextSpan(text: 'সর্বনিম্ন '), TextSpan(text: '${Money.bn(_minAmount.round())} টাকার', style: _bold)],
+    ];
+    return [
+      const TextSpan(text: "প্রথমে আপনার পছন্দের পণ্যটি বেছে নিন — তারপর সাইজ বা রঙের পাশে থাকা 'Add'-এ ট্যাপ/ক্লিক করে পরিমাণ লিখুন।"),
+      if (floors.isNotEmpty) ...[
+        const TextSpan(text: ' '),
+        for (final (i, f) in floors.indexed) ...[if (i > 0) const TextSpan(text: ' এবং '), ...f],
+        const TextSpan(text: ' অর্ডার করতে হবে।'),
+      ],
+    ];
+  }
+
+  /// shortMsg(): short of the minimum pieces, naming the supplier when the
+  /// floor is theirs.
+  List<InlineSpan> _shortMessage() {
+    final need = _floor;
+    return [
+      TextSpan(
+        text: need > _rules.storeMinQuantity
+            ? 'এই সাপ্লায়ার/ফ্যাক্টরি ${Money.bn(need)} টি আইটেমের নিচে অর্ডার গ্রহণ করেন না'
+            : 'এটি অর্ডার করতে আপনাকে কমপক্ষে ${Money.bn(need)} টি আইটেম যোগ করতে হবে',
+      ),
+      TextSpan(text: ' (আপনি যেকোনো ভ্যারিয়েন্ট মিলিয়ে নিতে পারেন) — আরও ${Money.bn(need - _pieces)} টি আইটেম যোগ করুন'),
+    ];
+  }
+
+  List<InlineSpan> _amountMessage() => [
+        const TextSpan(text: 'এই পণ্যটি অর্ডার করতে হলে পণ্যটির মোট মূল্য কমপক্ষে '),
+        TextSpan(text: Money.bn(Money.bdt('$_minAmount')), style: _bold),
+        const TextSpan(text: ' বা তার বেশি হতে হবে — অর্ডার করতে আরও '),
+        TextSpan(text: Money.bn(Money.bdt('${_minAmount - _total}')), style: _bold),
+        const TextSpan(text: ' এর পণ্য যোগ করুন।'),
+      ];
+
   Future<void> _add({required bool buyNow}) async {
     final cart = ref.read(cartProvider.notifier);
-    if (_pieces == 0) throw ApiError(code: 'no_quantity', message: 'Choose a quantity first — tap Add on an option.');
+    // The website's __attemptBuy(): explain, never pad a short selection up
+    // to the minimum behind the customer's back (owner, 29 Sep 2026: 2 pcs
+    // "added" and the cart showed 3).
+    if (_pieces == 0) {
+      return _almostThere(_hasOptions ? _pickMessage() : [const TextSpan(text: 'Please enter a quantity.')]);
+    }
+    if (_qtyShort) return _almostThere(_shortMessage());
+    if (_amountShort) return _almostThere(_amountMessage());
     if (_hasOptions) {
       await cart.add(p.id, variants: Map.fromEntries(_qty.entries.where((e) => e.value > 0)));
     } else {
@@ -248,7 +352,6 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
   // ---------------------------------------------------------------- buy
 
   Widget _buyCard() {
-    final belowMin = _pieces < p.minQuantity;
     final approxPieces = p.minOrderAmount == null
         ? null
         : ((double.tryParse(p.minOrderAmount!) ?? 0) / ((double.tryParse(p.unitPrice) ?? 1).clamp(0.01, double.infinity))).ceil();
@@ -271,18 +374,32 @@ class _ProductPageState extends ConsumerState<_ProductPage> {
               const SizedBox(width: 4),
               const Padding(padding: EdgeInsets.only(bottom: 3), child: Text('pcs selected', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
               const Spacer(),
-              Text(belowMin || _lineTotal == null ? Money.bdt('0') : Money.bdt(_lineTotal),
+              Text(Money.bdt(_pieces == 0 ? '0' : '$_total'),
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Brand.orange)),
             ]),
             const SizedBox(height: 10),
             Wrap(spacing: 8, runSpacing: 8, children: [
-              _Chip('Min ${p.minQuantity} pcs${p.minQuantityIsSupplier ? ' (supplier)' : ''}', amber: p.minQuantityIsSupplier),
+              if (p.minQuantity > 1) _Chip('Min ${p.minQuantity} pcs ${p.minQuantityIsSupplier ? '(supplier)' : 'per product'}', amber: p.minQuantityIsSupplier),
               if (p.minOrderAmount != null) _Chip('Min order ${Money.bdt(p.minOrderAmount)}${approxPieces != null ? ' · ≈ $approxPieces pcs' : ''}'),
               if (p.estimatedWeightKg != null) _Chip('~${Money.kg(p.estimatedWeightKg).replaceAll(' kg', '')} kg'),
             ]),
+            // The page's live hints, while the selection is short.
+            if (_qtyShort) _AmberHint([
+              TextSpan(text: p.minQuantityIsSupplier ? 'এই সাপ্লায়ার/ফ্যাক্টরি ' : 'এটি অর্ডার করতে আপনাকে কমপক্ষে '),
+              TextSpan(text: '${Money.bn(p.minQuantity)} টি', style: _bold),
+              TextSpan(text: p.minQuantityIsSupplier ? ' আইটেমের নিচে অর্ডার গ্রহণ করেন না' : ' আইটেম যোগ করতে হবে'),
+              const TextSpan(text: ' (আপনি যেকোনো ভ্যারিয়েন্ট মিলিয়ে নিতে পারেন) — আরও '),
+              TextSpan(text: Money.bn(_floor - _pieces), style: _bold),
+              const TextSpan(text: ' টি আইটেম যোগ করুন'),
+            ]),
+            if (_amountShort) _AmberHint(_amountMessage()),
           ]),
         ),
-        if (p.orderNote != null) ...[
+        if (_pieces > 0 && _rules.hasAdvance) ...[const SizedBox(height: 14), _AdvanceBox(rules: _rules, pieces: _pieces, total: _total)],
+        // The admin's condition note is pre-selection guidance: once a
+        // quantity is chosen the live hints carry the rules with real
+        // numbers, so the website hides it -- and so does the app.
+        if (p.orderNote != null && _pieces == 0) ...[
           const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(14),
@@ -525,6 +642,88 @@ class _CountBadge extends StatelessWidget {
         ),
         child: Text(NumberFormat('#,##0').format(count), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, height: 1.1)),
       );
+}
+
+/// An amber hint box under the running total, as the website's.
+class _AmberHint extends StatelessWidget {
+  const _AmberHint(this.spans);
+  final List<InlineSpan> spans;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(color: const Color(0xFFFFFBEB), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFFFDE68A))),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Padding(padding: EdgeInsets.only(top: 3), child: Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFF92400E))),
+          const SizedBox(width: 8),
+          Expanded(child: Text.rich(TextSpan(children: spans), style: const TextStyle(fontSize: 15, height: 1.65, color: Color(0xFF92400E)))),
+        ]),
+      );
+}
+
+/// The website's advance-payment box: what this selection costs, and what is
+/// payable now versus on delivery.
+class _AdvanceBox extends StatelessWidget {
+  const _AdvanceBox({required this.rules, required this.pieces, required this.total});
+  final OrderRules rules;
+  final int pieces;
+  final double total;
+
+  static const _hl = TextStyle(fontWeight: FontWeight.w800, color: Brand.orange);
+
+  @override
+  Widget build(BuildContext context) {
+    final now = rules.advanceOn(total);
+    final rest = total - now;
+    final pct = rules.advancePercent ?? 0;
+    String pctLabel(double v) => Money.bn(v == v.roundToDouble() ? v.round() : v);
+    final sentence = <InlineSpan>[
+      if (pct > 0 && pct < 100) ...[
+        const TextSpan(text: 'এখন আপনাকে মোট অর্ডারের '),
+        TextSpan(text: '${pctLabel(pct)}%', style: _hl),
+        const TextSpan(text: ' এর '),
+        TextSpan(text: Money.bdt('$now'), style: _hl),
+        const TextSpan(text: ' প্রদান করতে হবে — বাকি '),
+        TextSpan(text: '${pctLabel(100 - pct)}%', style: _hl),
+        const TextSpan(text: ' এর '),
+        TextSpan(text: Money.bdt('$rest'), style: _hl),
+        const TextSpan(text: ' ডেলিভারির সময় পরিশোধ করতে হবে।'),
+      ] else if (pct >= 100) ...[
+        const TextSpan(text: 'এখন আপনাকে মোট অর্ডারের '),
+        TextSpan(text: '${pctLabel(pct)}%', style: _hl),
+        const TextSpan(text: ' এর '),
+        TextSpan(text: Money.bdt('$now'), style: _hl),
+        const TextSpan(text: ' অর্থাৎ সম্পূর্ণ মূল্য পরিশোধ করতে হবে।'),
+      ] else ...[
+        const TextSpan(text: 'এখন আপনাকে সর্বনিম্ন '),
+        TextSpan(text: Money.bdt('${rules.advanceFixed}'), style: _hl),
+        const TextSpan(text: ' প্রদান করতে হবে — বাকি '),
+        TextSpan(text: Money.bdt('$rest'), style: _hl),
+        const TextSpan(text: ' ডেলিভারির সময় পরিশোধ করতে হবে।'),
+      ],
+    ];
+    Widget row(String label, String value, {bool strong = false}) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(children: [
+            Expanded(child: Text(label, style: TextStyle(fontSize: 15, color: strong ? Brand.ink : const Color(0xFF4B5563), fontWeight: strong ? FontWeight.w800 : FontWeight.w400))),
+            Text(value, style: TextStyle(fontSize: strong ? 17 : 15, fontWeight: strong ? FontWeight.w800 : FontWeight.w600, color: strong ? Brand.orange : Brand.ink)),
+          ]),
+        );
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: const Color(0xFFFFF7ED), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFFED7AA))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        row('Unit price', Money.bdt('${total / pieces}')),
+        row('Selected quantity', '$pieces'),
+        row('Total', Money.bdt('$total')),
+        const Divider(color: Color(0xFFFED7AA), height: 14),
+        row('Net payable now', Money.bdt('$now'), strong: true),
+        const SizedBox(height: 8),
+        Text.rich(TextSpan(children: sentence), textAlign: TextAlign.center, style: const TextStyle(fontSize: 15, height: 1.6, color: Color(0xFF374151))),
+      ]),
+    );
+  }
 }
 
 class _Pill extends StatelessWidget {

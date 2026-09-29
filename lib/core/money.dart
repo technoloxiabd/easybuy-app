@@ -12,6 +12,10 @@ class Money {
     return '৳${_whole.format(value.round())}';
   }
 
+  /// Western digits as Bengali numerals ("৳1,000" -> "৳১,০০০"): the
+  /// website's Bengali notices write their numbers this way.
+  static String bn(Object value) => '$value'.replaceAllMapped(RegExp(r'\d'), (m) => '০১২৩৪৫৬৭৮৯'[int.parse(m[0]!)]);
+
   static bool isPositive(String? amount) => (double.tryParse(amount ?? '') ?? 0) > 0.004;
 
   static final _compact = NumberFormat.compact(locale: 'en');

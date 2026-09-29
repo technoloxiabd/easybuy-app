@@ -161,7 +161,7 @@ class PriceTier {
 }
 
 class ProductDetail {
-  ProductDetail({required this.id, required this.title, required this.images, required this.unitPrice, required this.minQuantity, required this.minQuantityIsSupplier, required this.priceTiers, required this.variants, required this.variantsPricedSeparately, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.estimatedWeightKg, this.slug, this.repurchaseRate, this.isSuperFactory = false, this.categoryId, this.categoryName, this.ordersCount = 0, this.onPricingHold = false, this.videoUrl, this.campaignLabel, this.minOrderAmount, this.orderNote, this.specs = const [], this.descriptionImages, this.seller, this.shippingTitle = 'Shipping charges', this.shipping = const []});
+  ProductDetail({required this.id, required this.title, required this.images, required this.unitPrice, required this.minQuantity, required this.minQuantityIsSupplier, required this.priceTiers, required this.variants, required this.variantsPricedSeparately, required this.isFactory, required this.isSoldOut, required this.saleCount, this.rating, this.estimatedWeightKg, this.slug, this.repurchaseRate, this.isSuperFactory = false, this.categoryId, this.categoryName, this.ordersCount = 0, this.onPricingHold = false, this.videoUrl, this.campaignLabel, this.minOrderAmount, this.orderNote, this.specs = const [], this.descriptionImages, this.seller, this.shippingTitle = 'Shipping charges', this.shipping = const [], this.orderRules = const OrderRules()});
 
   final int id;
   final String title;
@@ -188,6 +188,9 @@ class ProductDetail {
   final String? campaignLabel;
   final String? minOrderAmount;
   final String? orderNote;
+
+  /// The page's buying rules, for the Add to Cart gate and the advance box.
+  final OrderRules orderRules;
   final List<Attribute> specs;
 
   /// Null until fetched (GET /products/{id}/description).
@@ -229,6 +232,7 @@ class ProductDetail {
         campaignLabel: strOrNull(obj(j['campaign'])['label']),
         minOrderAmount: strOrNull(j['min_order_amount_bdt']),
         orderNote: strOrNull(j['order_note']),
+        orderRules: OrderRules.fromJson(obj(j['order_rules'])),
         specs: listOf(j['specs'], (e) => Attribute(str(e['name']), str(e['value']))),
         descriptionImages: j['description_images'] is List ? (j['description_images'] as List).map((e) => '$e').toList() : null,
         seller: objOrNull(j['seller']),
@@ -240,6 +244,54 @@ class ProductDetail {
 // ---------------------------------------------------------------- website pages
 
 /// Where a banner leads: product / category screen, the Shop tab, or a web page.
+/// The website product page's buying rules (its script's MOQ, SUPPLIER_MOQ,
+/// HIGH_VALUE_CAP and advance), so the app blocks exactly what it blocks.
+class OrderRules {
+  const OrderRules({this.storeMinQuantity = 1, this.supplierMinQuantity = 1, this.highValueCap, this.advancePercent, this.advanceFixed = 0});
+  final int storeMinQuantity;
+  final int supplierMinQuantity;
+  final double? highValueCap;
+
+  /// Null when no advance applies; then everything is paid now.
+  final double? advancePercent;
+  final double advanceFixed;
+  bool get hasAdvance => advancePercent != null;
+
+  factory OrderRules.fromJson(Json j) {
+    final adv = objOrNull(j['advance']);
+    return OrderRules(
+      storeMinQuantity: integer(j['store_min_quantity'], 1),
+      supplierMinQuantity: integer(j['supplier_min_quantity'], 1),
+      highValueCap: double.tryParse('${j['high_value_cap_bdt']}'),
+      advancePercent: adv == null ? null : (double.tryParse('${adv['percent']}') ?? 0),
+      advanceFixed: adv == null ? 0 : (double.tryParse('${adv['fixed_bdt']}') ?? 0),
+    );
+  }
+
+  /// "Net payable now" on a total: the greater of the fixed amount and the
+  /// percentage, never more than the total, rounded up -- the page's formula.
+  double advanceOn(double total) {
+    if (!hasAdvance) return total;
+    final a = [advanceFixed, total * advancePercent! / 100].reduce((x, y) => x > y ? x : y);
+    return (a > total ? total : a).ceilToDouble();
+  }
+}
+
+/// A tile in the search screen's rail: a popular search or a category.
+class SearchTile {
+  SearchTile({required this.label, this.imageUrl, this.query, this.categoryId});
+  final String label;
+  final String? imageUrl;
+  final String? query;
+  final int? categoryId;
+  factory SearchTile.fromJson(Json j) => SearchTile(
+        label: str(j['label']),
+        imageUrl: strOrNull(j['image_url']),
+        query: strOrNull(j['query']),
+        categoryId: intOrNull(j['category_id']),
+      );
+}
+
 class LinkTarget {
   LinkTarget(this.type, this.id, this.url);
   final String type;
@@ -433,8 +485,34 @@ class CouponState {
       );
 }
 
+/// The website cart page's "Order summary" for the ticked lines.
+class CartSummary {
+  CartSummary({required this.selectedProducts, this.campaign, required this.netGoods, required this.hasAdvance, required this.dueNow, required this.dueLater, this.advancePercent});
+  final int selectedProducts;
+  final Json? campaign;
+  final String netGoods;
+  final bool hasAdvance;
+  final String dueNow;
+  final String dueLater;
+  final String? advancePercent;
+  factory CartSummary.fromJson(Json j) => CartSummary(
+        selectedProducts: integer(j['selected_products']),
+        campaign: objOrNull(j['campaign']),
+        netGoods: str(j['net_goods_bdt'], '0.00'),
+        hasAdvance: boolean(j['has_advance']),
+        dueNow: str(j['due_now_bdt'], '0.00'),
+        dueLater: str(j['due_later_bdt'], '0.00'),
+        advancePercent: strOrNull(j['advance_percent']),
+      );
+}
+
 class Cart {
-  Cart({required this.items, required this.itemCount, required this.goodsTotal, required this.selectedCount, required this.selectedTotal, this.coupon, this.shippingMethod, this.deliveryMethod, required this.warnings});
+  Cart({required this.items, required this.itemCount, required this.goodsTotal, required this.selectedCount, required this.selectedTotal, this.coupon, this.shippingMethod, this.deliveryMethod, required this.warnings, this.summary, this.shippingMethods = const [], this.deliveryMethods = const [], this.deliveryChoiceRequired = false});
+
+  final CartSummary? summary;
+  final List<ShippingMethod> shippingMethods;
+  final List<DeliveryMethod> deliveryMethods;
+  final bool deliveryChoiceRequired;
 
   final List<CartItem> items;
   final int itemCount;
@@ -460,6 +538,10 @@ class Cart {
         shippingMethod: strOrNull(j['shipping_method']),
         deliveryMethod: strOrNull(j['delivery_method']),
         warnings: listOf(j['warnings'], Notice.fromJson),
+        summary: objOrNull(j['summary']) == null ? null : CartSummary.fromJson(obj(j['summary'])),
+        shippingMethods: listOf(j['shipping_methods'], ShippingMethod.fromJson),
+        deliveryMethods: listOf(j['delivery_methods'], DeliveryMethod.fromJson),
+        deliveryChoiceRequired: boolean(j['delivery_choice_required']),
       );
 }
 
@@ -499,7 +581,11 @@ class DeliveryMethod {
 }
 
 class Checkout {
-  Checkout({required this.lines, required this.itemCount, required this.goodsTotal, this.campaign, this.coupon, required this.netGoods, required this.dueNow, required this.dueLater, this.advancePercent, required this.creditBalance, this.shippingMethod, required this.shippingMethods, this.deliveryMethod, required this.deliveryChoiceRequired, required this.deliveryMethods, required this.addresses, this.defaultAddressId, this.termsTitle, this.termsHtml, required this.blockers, required this.canPlace});
+  Checkout({required this.lines, required this.itemCount, required this.goodsTotal, this.campaign, this.coupon, required this.netGoods, required this.dueNow, required this.dueLater, this.advancePercent, required this.creditBalance, this.shippingMethod, required this.shippingMethods, this.deliveryMethod, required this.deliveryChoiceRequired, required this.deliveryMethods, required this.addresses, this.defaultAddressId, this.termsTitle, this.termsHtml, required this.blockers, required this.canPlace, this.paymentMethods = const [], this.paymentMethodRequired = false});
+
+  /// Chosen before placing, as on the website's checkout.
+  final List<PayMethod> paymentMethods;
+  final bool paymentMethodRequired;
 
   final List<CartItem> lines;
   final int itemCount;
@@ -549,6 +635,8 @@ class Checkout {
       termsHtml: terms == null ? null : str(terms['html']),
       blockers: listOf(j['blockers'], Notice.fromJson),
       canPlace: boolean(j['can_place']),
+      paymentMethods: listOf(payment['methods'], PayMethod.fromJson),
+      paymentMethodRequired: boolean(payment['method_required']),
     );
   }
 }

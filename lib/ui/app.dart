@@ -21,7 +21,7 @@ import 'screens/order_screens.dart';
 import 'screens/pay_screen.dart';
 import 'screens/support_screens.dart';
 import 'screens/videos_screen.dart';
-import '../state/wishlist.dart';
+import 'widgets/tab_bar.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -58,6 +58,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         ],
       ),
       GoRoute(path: '/search', parentNavigatorKey: _rootKey, builder: (_, s) => SearchScreen(initial: s.uri.queryParameters['q'])),
+      // Search results: the Shop listing for the query, as the website's.
+      GoRoute(path: '/search/results', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(query: s.uri.queryParameters['q'])),
       GoRoute(path: '/search/image', parentNavigatorKey: _rootKey, builder: (_, s) => ImageSearchScreen(path: s.extra as String?)),
       GoRoute(path: '/videos', parentNavigatorKey: _rootKey, builder: (_, _) => const VideosScreen()),
       GoRoute(path: '/category/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(categoryId: int.parse(s.pathParameters['id']!))),
@@ -153,64 +155,16 @@ class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
       );
 }
 
-class HomeShell extends ConsumerWidget {
+class HomeShell extends StatelessWidget {
   const HomeShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
 
-  static const _tabs = [
-    (Icons.home_outlined, 'Home'),
-    (Icons.menu, 'Categories'),
-    (Icons.shopping_cart_outlined, 'Cart'),
-    (Icons.favorite_border, 'Wishlist'),
-    (Icons.storefront_outlined, 'Shop'),
-    (Icons.person_outline, 'Account'),
-  ];
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final cartCount = ref.watch(cartCountProvider);
-    final saved = ref.watch(wishlistProvider).length;
-    return Scaffold(
-      body: shell,
-      // The website's bottom bar: white, hairline top, the active tab orange
-      // with a short orange dash above it.
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-          boxShadow: [BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, -2))],
+  Widget build(BuildContext context) => Scaffold(
+        body: shell,
+        bottomNavigationBar: SiteTabBar(
+          current: shell.currentIndex,
+          onTap: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
         ),
-        child: SafeArea(
-          top: false,
-          child: Row(children: [
-            for (final (i, (icon, label)) in _tabs.indexed)
-              Expanded(
-                child: InkWell(
-                  onTap: () => shell.goBranch(i, initialLocation: i == shell.currentIndex),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 6),
-                    child: Stack(clipBehavior: Clip.none, alignment: Alignment.topCenter, children: [
-                      if (i == shell.currentIndex)
-                        Positioned(top: -9, child: Container(width: 32, height: 2.5, decoration: BoxDecoration(color: Brand.orange, borderRadius: BorderRadius.circular(2)))),
-                      Column(mainAxisSize: MainAxisSize.min, children: [
-                        Badge(
-                          isLabelVisible: (i == 2 && cartCount > 0) || (i == 3 && saved > 0),
-                          backgroundColor: Brand.orange,
-                          label: Text('${i == 2 ? cartCount : saved}'),
-                          child: Icon(icon, size: 24, color: i == shell.currentIndex ? Brand.orange : const Color(0xFF4B5563)),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(label,
-                            maxLines: 1,
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: i == shell.currentIndex ? Brand.orange : const Color(0xFF4B5563))),
-                      ]),
-                    ]),
-                  ),
-                ),
-              ),
-          ]),
-        ),
-      ),
-    );
-  }
+      );
 }

@@ -117,6 +117,8 @@ class CartNotifier extends AsyncNotifier<Cart> {
 
   Future<void> clear() => _apply(_api.clearCart);
 
+  Future<void> setMethods({String? shipping, String? delivery}) => _apply(() => _api.cartMethods(shipping: shipping, delivery: delivery));
+
   Future<void> applyCoupon(String code) => _apply(() => _api.applyCoupon(code));
 
   Future<void> removeCoupon() => _apply(_api.removeCoupon);

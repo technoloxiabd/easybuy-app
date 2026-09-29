@@ -93,6 +93,9 @@ class EasyBuyApi {
     return data['images'] is List ? (data['images'] as List).map((e) => '$e').toList() : const [];
   }
 
+  /// The search screen's tile rail: the website header dropdown's tiles.
+  Future<List<SearchTile>> searchTiles() async => listOf((await client.get('/search/tiles'))['data'], SearchTile.fromJson);
+
   Future<List<String>> suggest(String q) async {
     final r = await client.get('/search/suggest', query: {'q': q});
     final data = r['data'];
@@ -122,6 +125,10 @@ class EasyBuyApi {
   Future<Cart> selectAll(bool selected, {int? productId}) async =>
       Cart.fromJson(obj((await client.patch('/cart/selection', body: {'selected': selected, 'product_id': productId}))['data']));
 
+  /// Shipping and delivery, chosen on the cart as on the website (guests too).
+  Future<Cart> cartMethods({String? shipping, String? delivery}) async =>
+      Cart.fromJson(obj((await client.patch('/cart/methods', body: {'shipping_method': shipping, 'delivery_method': delivery}..removeWhere((k, v) => v == null)))['data']));
+
   Future<Cart> clearCart() async => Cart.fromJson(obj((await client.delete('/cart'))['data']));
 
   Future<Cart> applyCoupon(String code) async => Cart.fromJson(obj((await client.post('/cart/coupon', body: {'code': code}))['data']));
@@ -139,14 +146,23 @@ class EasyBuyApi {
   /// so a dropped connection can never place the order twice.
   static String newIdempotencyKey() => const Uuid().v4();
 
-  Future<OrderSummary> placeOrder({required String idempotencyKey, int? addressId, String? name, String? phone, String? address, bool saveAddress = true, String? notes, bool useCredit = false}) async {
+  /// Place the order WITH its payment, as the website's checkout does: the
+  /// method, and for a manual one the reference and receipts. Returns the
+  /// order and what happened to the payment (`status`: submitted, redirect
+  /// (open `redirect_url`), not_needed or failed, with a `message`).
+  Future<(OrderSummary, Json?)> placeOrder({required String idempotencyKey, int? addressId, String? name, String? phone, String? address, bool saveAddress = true, String? notes, bool useCredit = false, int? paymentMethodId, String? reference, List<String> proofPaths = const []}) async {
     final body = <String, dynamic>{
-      if (addressId != null) 'address_id': addressId else ...{'name': name, 'phone': phone, 'address': address, 'save_address': saveAddress},
+      if (addressId != null) 'address_id': addressId else ...{'name': name, 'phone': phone, 'address': address, 'save_address': saveAddress ? 1 : 0},
       if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
-      if (useCredit) 'use_credit': true,
+      if (useCredit) 'use_credit': 1,
+      'payment_method_id': ?paymentMethodId,
+      if (reference != null && reference.trim().isNotEmpty) 'reference': reference.trim(),
     };
-    final r = await client.post('/checkout', body: body, headers: {'Idempotency-Key': idempotencyKey});
-    return OrderSummary.fromJson(obj(r['data']));
+    final Object payload = proofPaths.isEmpty
+        ? body
+        : FormData.fromMap({...body, 'proof[]': [for (final p in proofPaths) await MultipartFile.fromFile(p)]});
+    final r = await client.post('/checkout', body: payload, headers: {'Idempotency-Key': idempotencyKey});
+    return (OrderSummary.fromJson(obj(r['data'])), objOrNull(obj(r['meta'])['payment']));
   }
 
   // ---------------------------------------------------------- orders

@@ -8,6 +8,7 @@ import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/site.dart';
 import '../widgets/video.dart';
+import '../widgets/tab_bar.dart';
 
 final videosProvider = FutureProvider.autoDispose.family<(List<HomeVideo>, List<String>), String?>(
   (ref, category) => ref.read(apiProvider).videos(category: category),
@@ -33,6 +34,7 @@ class _VideosScreenState extends ConsumerState<VideosScreen> {
 
     return Scaffold(
       appBar: const SiteHeader(),
+      bottomNavigationBar: const PageTabBar(current: null),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(videosProvider(_category)),
         child: CustomScrollView(slivers: [

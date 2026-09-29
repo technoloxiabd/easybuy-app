@@ -3,12 +3,54 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/theme.dart';
+import '../../data/models.dart';
 import '../../state/providers.dart';
-import '../widgets/product_grid.dart';
+import '../widgets/common.dart';
+import 'image_search_screen.dart' show startImageSearch;
 
 // ------------------------------------------------------------------ search
 
+final searchTilesProvider = FutureProvider<List<SearchTile>>((ref) => ref.read(apiProvider).searchTiles());
+
+/// This phone's recent searches -- the website keeps them in the browser
+/// (easybuy.recent-searches, 8 newest, no repeats) and so does the app.
+/// What one shopper typed is never sent anywhere.
+class RecentSearches {
+  static const _key = 'easybuy.recent-searches';
+  static const _max = 8;
+
+  static Future<List<String>> read() async {
+    try {
+      return (await SharedPreferences.getInstance()).getStringList(_key) ?? const [];
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static Future<void> remember(String term) async {
+    term = term.trim();
+    if (term.length < 2) return;
+    final kept = (await read()).where((t) => t.toLowerCase() != term.toLowerCase()).toList()..insert(0, term);
+    try {
+      await (await SharedPreferences.getInstance()).setStringList(_key, kept.take(_max).toList());
+    } catch (_) {}
+  }
+
+  static Future<void> clear() async {
+    try {
+      await (await SharedPreferences.getInstance()).remove(_key);
+    } catch (_) {}
+  }
+}
+
+/// The website's search panel: the tile rail (popular searches with a
+/// picture, then categories), this phone's Recent Searches, and -- once two
+/// letters are typed -- the type-ahead in their place. Searching opens the
+/// results as the website does: the Shop listing, with its sort and filters.
 class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key, this.initial});
   final String? initial;
@@ -19,15 +61,16 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   late final _controller = TextEditingController(text: widget.initial);
-  String? _query;
-  String _sort = '';
   List<String> _suggestions = const [];
+  List<String> _recents = const [];
   Timer? _debounce;
 
   @override
   void initState() {
     super.initState();
-    _query = widget.initial;
+    RecentSearches.read().then((r) {
+      if (mounted) setState(() => _recents = r);
+    });
   }
 
   @override
@@ -39,7 +82,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   void _typed(String text) {
     _debounce?.cancel();
-    setState(() => _query = null);
     if (text.trim().length < 2) {
       setState(() => _suggestions = const []);
       return;
@@ -47,34 +89,36 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce = Timer(const Duration(milliseconds: 220), () async {
       try {
         final s = await ref.read(apiProvider).suggest(text.trim());
-        if (mounted && _query == null) setState(() => _suggestions = s);
+        if (mounted && _controller.text.trim().length >= 2) setState(() => _suggestions = s);
       } catch (_) {
         // Suggestions are a convenience; typing still works without them.
       }
     });
   }
 
-  void _submit(String text) {
-    if (text.trim().isEmpty) return;
+  /// A typed search is remembered; a tile or a recent chip just opens.
+  Future<void> _search(String term, {bool remember = true}) async {
+    term = term.trim();
+    if (term.isEmpty) return;
+    if (remember) await RecentSearches.remember(term);
+    if (!mounted) return;
     FocusScope.of(context).unfocus();
-    _controller.text = text.trim();
-    setState(() {
-      _query = text.trim();
-      _suggestions = const [];
-    });
+    context.pushReplacement('/search/results?q=${Uri.encodeQueryComponent(term)}');
   }
 
   @override
   Widget build(BuildContext context) {
+    final typing = _controller.text.trim().length >= 2 && _suggestions.isNotEmpty;
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         titleSpacing: 0,
         title: TextField(
           controller: _controller,
-          autofocus: widget.initial == null,
+          autofocus: true,
           textInputAction: TextInputAction.search,
           onChanged: _typed,
-          onSubmitted: _submit,
+          onSubmitted: _search,
           style: const TextStyle(fontSize: 16),
           decoration: InputDecoration(
             hintText: 'Search',
@@ -82,33 +126,137 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: const BorderSide(color: Color(0xFFD1D5DB))),
-            suffixIcon: const Icon(Icons.search, color: Brand.blue),
+            suffixIcon: IconButton(icon: const Icon(Icons.search, color: Brand.blue), onPressed: () => _search(_controller.text)),
           ),
         ),
         actions: [
-          if (_query != null)
-            PopupMenuButton<String>(
-              tooltip: 'Sort',
-              icon: const Icon(Icons.sort),
-              initialValue: _sort,
-              onSelected: (v) => setState(() => _sort = v),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: '', child: Text('Best match')),
-                PopupMenuItem(value: 'price_asc', child: Text('Price: low to high')),
-                PopupMenuItem(value: 'price_desc', child: Text('Price: high to low')),
-                PopupMenuItem(value: 'newest', child: Text('Newest')),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(left: 8, right: 12),
+            child: Material(
+              color: Brand.blue,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => startImageSearch(context),
+                child: const SizedBox(width: 42, height: 42, child: Icon(Icons.photo_camera_outlined, color: Colors.white, size: 21)),
+              ),
             ),
+          ),
         ],
       ),
-      body: _query != null
-          ? ProductGrid(listing: ListingQuery(query: _query, sort: _sort.isEmpty ? null : _sort))
-          : ListView(children: [
-              for (final s in _suggestions)
-                ListTile(leading: const Icon(Icons.search), title: Text(s), onTap: () => _submit(s)),
-            ]),
+      body: typing ? _suggestionList() : _panel(),
     );
   }
+
+  Widget _suggestionList() => ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        children: [
+          for (final s in _suggestions)
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => _search(s),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                child: Row(children: [
+                  Icon(Icons.search, size: 17, color: Colors.grey.shade400),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(s, style: const TextStyle(fontSize: 15, color: Color(0xFF374151)))),
+                ]),
+              ),
+            ),
+        ],
+      );
+
+  Widget _panel() {
+    final tiles = ref.watch(searchTilesProvider).value ?? const <SearchTile>[];
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 24), children: [
+      if (tiles.isNotEmpty)
+        LayoutBuilder(builder: (context, box) {
+          // Four tiles and the edge of a fifth, as on the website's phone
+          // view: the half tile says "swipe".
+          final w = (box.maxWidth - 3 * 12) / 4.45;
+          return SizedBox(
+            height: w + 52,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: tiles.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (_, i) => _Tile(tile: tiles[i], width: w, onSearch: (q) => _search(q, remember: false)),
+            ),
+          );
+        }),
+      if (_recents.isNotEmpty)
+        Container(
+          margin: EdgeInsets.only(top: tiles.isEmpty ? 0 : 16),
+          padding: const EdgeInsets.only(top: 16),
+          decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFF3F4F6)))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Expanded(child: Text('Recent Searches', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Brand.blue))),
+              TextButton(
+                style: TextButton.styleFrom(foregroundColor: Colors.grey.shade500, visualDensity: VisualDensity.compact),
+                onPressed: () async {
+                  await RecentSearches.clear();
+                  if (mounted) setState(() => _recents = const []);
+                },
+                child: const Text('Clear', style: TextStyle(fontSize: 13)),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final term in _recents)
+                Material(
+                  color: const Color(0xFFF3F4F6),
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _search(term, remember: false),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Text(term, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Color(0xFF374151))),
+                    ),
+                  ),
+                ),
+            ]),
+          ]),
+        ),
+    ]);
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.tile, required this.width, required this.onSearch});
+  final SearchTile tile;
+  final double width;
+  final ValueChanged<String> onSearch;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: width,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => tile.categoryId != null ? context.push('/category/${tile.categoryId}') : onSearch(tile.query ?? tile.label),
+          child: Column(children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: width,
+                height: width,
+                color: const Color(0xFFF3F4F6),
+                child: tile.imageUrl != null
+                    ? NetImage(tile.imageUrl, radius: 0)
+                    : Icon(Icons.search, size: 28, color: Colors.grey.shade300),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(tile.label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1F2937), height: 1.2)),
+          ]),
+        ),
+      );
 }
 
 /// A − n + control. Tapping the number lets the customer type one.

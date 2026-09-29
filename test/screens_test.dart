@@ -56,6 +56,7 @@ class LiveData {
   late List<Highlight> highlights;
   late List<ProductCard> related;
   late (List<HomeVideo>, List<String>) videos;
+  late List<SearchTile> tiles;
   late String photo;
 }
 
@@ -101,6 +102,9 @@ class ShotApi extends EasyBuyApi {
   Future<List<ProductCard>> related(int id) async => live.related;
 
   @override
+  Future<List<SearchTile>> searchTiles() async => live.tiles;
+
+  @override
   Future<(List<HomeVideo>, List<String>)> videos({String? category}) async => live.videos;
 
   // Sample matches from the live catalogue: a real photo search spends
@@ -126,9 +130,24 @@ class ShotApi extends EasyBuyApi {
         goodsTotal: '4200.00',
         selectedCount: 5 + p1.minQuantity,
         selectedTotal: '4200.00',
-        coupon: CouponState(code: 'EID10', label: '10% off', isValid: true),
+        coupon: CouponState(code: 'EID10', label: '10% off', isValid: true, discount: '420.00'),
         warnings: const [],
+        shippingMethod: 'By Air',
+        deliveryMethod: 'Delivery by Courier',
+        deliveryChoiceRequired: true,
+        summary: CartSummary(selectedProducts: 2, netGoods: '3780.00', hasAdvance: true, dueNow: '1890.00', dueLater: '1890.00', advancePercent: '50'),
+        shippingMethods: _shipping,
+        deliveryMethods: _delivery,
       );
+
+  static final _shipping = [
+    ShippingMethod(name: 'By Air', isAvailable: true, rates: [ShippingRate('Category A', '770.00', 'From ৳770/kg.')]),
+    ShippingMethod(name: 'By Sea', minAmount: '10000.00', isAvailable: false, rates: const []),
+  ];
+  static final _delivery = [
+    DeliveryMethod(name: 'Collect From Dhaka Warehouse', type: 'pickup', isDefault: false),
+    DeliveryMethod(name: 'Delivery by Courier', type: 'courier', note: 'কুরিয়ার চার্জ আপনার লোকেশন অনুযায়ী প্রযোজ্য হবে এবং ডেলিভারির সময় পরিশোধ করতে হবে।', isDefault: false),
+  ];
 
   @override
   Future<Checkout> checkout() async {
@@ -158,6 +177,13 @@ class ShotApi extends EasyBuyApi {
       defaultAddressId: 1,
       blockers: const [],
       canPlace: true,
+      paymentMethods: [
+        PayMethod(id: 1, name: 'bKash (Merchant)', type: 'manual', instructions: 'Use "Payment" in the bKash app to the merchant number below, then enter the TrxID.',
+            account: {'account_name': 'EasyBuy', 'account_number': '01XXXXXXXXX'}, collectsReference: true, collectsProof: true),
+        PayMethod(id: 2, name: 'The City Bank Plc', type: 'manual', account: const {}, collectsReference: true, collectsProof: true),
+        PayMethod(id: 5, name: 'Dutch Bangla Bank (DBBL)', type: 'manual', account: const {}, collectsReference: true, collectsProof: true),
+      ],
+      paymentMethodRequired: true,
     );
   }
 
@@ -268,6 +294,7 @@ void main() {
       live.highlights = await real.highlights(category: 12697);
       live.related = await real.related(144381);
       live.videos = await real.videos();
+      live.tiles = await real.searchTiles();
 
       final urls = {
         ...live.products.map((p) => p.imageUrl!),
@@ -281,6 +308,7 @@ void main() {
         ...live.detail.variants.map((v) => v.imageUrl).whereType<String>().take(12),
         ...live.related.map((p) => p.imageUrl).whereType<String>(),
         ...live.videos.$1.map((v) => v.posterUrl).whereType<String>(),
+        ...live.tiles.map((t) => t.imageUrl).whereType<String>(),
       };
       final client = HttpClient();
       for (final u in urls) {
@@ -349,6 +377,12 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Add').first);
     await settle();
     await shot('07_product_options');
+    // Below the minimum: the website's "Almost there", not a padded cart.
+    await tester.tap(find.text('Buy Now'));
+    await settle();
+    await shot('20_product_almost_there');
+    await tester.tap(find.text('OK, got it'));
+    await settle();
     await scrollTo(1900);
     await shot('08_product_shipping');
     // A lazy list learns its full length as it scrolls: step to the end.
@@ -376,6 +410,41 @@ void main() {
     router.go('/cart');
     await settle();
     await shot('09_cart');
+    await scrollTo(1100);
+    await shot('13_cart_summary');
+    await scrollTo(100000);
+    await shot('14_cart_methods');
+
+    router.push('/checkout');
+    await settle();
+    await shot('15_checkout');
+    await scrollTo(1300);
+    await shot('16_checkout_delivery');
+    for (var i = 0; i < 4; i++) {
+      await scrollTo(100000);
+    }
+    await tester.tap(find.text('bKash (Merchant)'));
+    await settle();
+    for (var i = 0; i < 4; i++) {
+      await scrollTo(100000);
+    }
+    await shot('17_checkout_payment');
+    router.pop();
+    await settle();
+
+    // A search from the header: tiles, then this phone's recent searches.
+    router.push('/search');
+    await settle();
+    await shot('18_search');
+    router.pop();
+    await settle();
+
+    // A category page keeps the tab bar, with Shop lit.
+    router.push('/category/12697');
+    await settle();
+    await shot('19_category_tabs');
+    router.pop();
+    await settle();
 
     await tester.pumpWidget(const SizedBox());
   }, timeout: const Timeout(Duration(minutes: 3)));

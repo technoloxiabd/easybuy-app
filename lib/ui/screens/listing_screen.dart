@@ -10,6 +10,7 @@ import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/product_grid.dart';
 import '../widgets/site.dart';
+import '../widgets/tab_bar.dart';
 
 final categoryInfoProvider = FutureProvider.autoDispose.family<CategoryInfo, int>((ref, id) => ref.read(apiProvider).category(id));
 final highlightsProvider = FutureProvider.autoDispose.family<List<Highlight>, int?>((ref, id) => ref.read(apiProvider).highlights(category: id));
@@ -39,6 +40,10 @@ class _ListingScreenState extends ConsumerState<ListingScreen> {
 
     return Scaffold(
       appBar: const SiteHeader(),
+      // Opened over the tabs (a category, a search): the website keeps its
+      // tab bar on these pages, with Shop lit. The Shop tab itself is in the
+      // tab shell and already has one.
+      bottomNavigationBar: id != null || widget.query != null ? const PageTabBar() : null,
       body: ProductGrid(
         listing: _listing,
         onRefresh: () async {

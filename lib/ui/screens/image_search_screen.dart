@@ -13,6 +13,7 @@ import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
 import '../widgets/site.dart';
+import '../widgets/tab_bar.dart';
 
 /// The camera button: pick a photo, then search with it. [replace] swaps the
 /// current results page for the new one instead of stacking another.
@@ -168,6 +169,7 @@ class _ImageSearchScreenState extends ConsumerState<ImageSearchScreen> {
 
     return Scaffold(
       appBar: const SiteHeader(),
+      bottomNavigationBar: const PageTabBar(current: null),
       body: CustomScrollView(slivers: [
         SliverToBoxAdapter(child: _header(searching)),
         if (widget.path == null)
