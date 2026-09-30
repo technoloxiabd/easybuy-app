@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
+import '../widgets/footer.dart';
 import '../widgets/site.dart';
 import '../widgets/video.dart';
 import 'article_screen.dart' show openSiteLink;
@@ -43,7 +44,10 @@ class HomeScreen extends ConsumerWidget {
         loading: () => const LoadingView(),
         error: (e, _) => ErrorView(error: e, onRetry: () => ref.invalidate(homeProvider)),
         data: (home) => RefreshIndicator(
-          onRefresh: () => ref.refresh(homeProvider.future),
+          onRefresh: () {
+            ref.invalidate(companyProvider);
+            return ref.refresh(homeProvider.future);
+          },
           child: CustomScrollView(slivers: [
             if (home.banners.isNotEmpty) SliverToBoxAdapter(child: _BannerSlider(banners: home.banners)),
             if (home.categories.isNotEmpty) SliverToBoxAdapter(child: _CategoryCard(categories: home.categories)),
@@ -58,7 +62,9 @@ class HomeScreen extends ConsumerWidget {
                 onViewAll: s.categoryId == null ? null : () => context.push('/category/${s.categoryId}'),
               ),
             if (home.posts.isNotEmpty) SliverToBoxAdapter(child: _BlogBand(posts: home.posts, heading: home.postsHeading)),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            // The website's homepage ends in its footer, the last band
+            // running straight into it.
+            const SliverToBoxAdapter(child: SiteFooter()),
           ]),
         ),
       ),

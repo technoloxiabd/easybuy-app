@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/config.dart';
 import '../core/push.dart';
@@ -120,6 +122,9 @@ String? pushRoute(Map<String, dynamic> data) => switch (data['type']) {
       'order' when data['order_number'] != null => '/orders/${data['order_number']}',
       'complaint' when data['complaint_number'] != null => '/support/${data['complaint_number']}',
       'chat' => '/chat',
+      // An admin broadcast (Marketing › App push): its link, when the app
+      // has a screen for it; one without a link just opens the app.
+      'link' when data['url'] != null => appRouteFor('${data['url']}'),
       _ => null,
     };
 
@@ -139,7 +144,14 @@ class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
     final push = PushService.instance;
     _subs.add(push.taps.listen((data) {
       final route = pushRoute(data);
-      if (route != null) ref.read(routerProvider).push(route);
+      if (route == '/shop') {
+        ref.read(routerProvider).go(route!);
+      } else if (route != null) {
+        ref.read(routerProvider).push(route);
+      } else if (data['type'] == 'link' && data['url'] != null) {
+        // A page the app has no screen for: the browser.
+        launchUrl(Uri.parse('${data['url']}'), mode: LaunchMode.externalApplication).ignore();
+      }
     }));
     // Open app: PushService puts it in the notification bar; bring the
     // Messages count up to date at once.
@@ -166,16 +178,68 @@ class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
       );
 }
 
-class HomeShell extends StatelessWidget {
+/// The tab shell. Android's back (button or edge swipe) steps back through
+/// the tabs visited, then on Home asks for a second back before leaving
+/// (owner, 30 Sep 2026: back on any tab but Home closed the app). Pages
+/// pushed over the tabs still pop as before: this PopScope is only asked
+/// when the shell itself is the top route.
+class HomeShell extends StatefulWidget {
   const HomeShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: shell,
-        bottomNavigationBar: SiteTabBar(
-          current: shell.currentIndex,
-          onTap: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+  State<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends State<HomeShell> {
+  /// Tabs visited, each once, the current one last.
+  late final _visited = [widget.shell.currentIndex];
+  DateTime? _exitAskedAt;
+
+  @override
+  void didUpdateWidget(HomeShell old) {
+    super.didUpdateWidget(old);
+    // Every way onto a tab lands here: the bar, a button's context.go, a
+    // page's tab bar.
+    final i = widget.shell.currentIndex;
+    if (_visited.last != i) {
+      _visited
+        ..remove(i)
+        ..add(i);
+    }
+  }
+
+  void _back() {
+    final shell = widget.shell;
+    if (_visited.length > 1 || shell.currentIndex != 0) {
+      _visited.removeLast();
+      if (_visited.isEmpty) _visited.add(0);
+      shell.goBranch(_visited.last);
+      return;
+    }
+    final now = DateTime.now();
+    if (_exitAskedAt != null && now.difference(_exitAskedAt!) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return;
+    }
+    _exitAskedAt = now;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('Press back again to exit'), backgroundColor: Brand.ink, behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2)));
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _back();
+        },
+        child: Scaffold(
+          body: widget.shell,
+          bottomNavigationBar: SiteTabBar(
+            current: widget.shell.currentIndex,
+            onTap: (i) => widget.shell.goBranch(i, initialLocation: i == widget.shell.currentIndex),
+          ),
         ),
       );
 }

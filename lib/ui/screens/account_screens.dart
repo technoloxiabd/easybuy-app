@@ -10,6 +10,7 @@ import '../../data/json.dart';
 import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
+import '../widgets/footer.dart';
 import '../widgets/pickers.dart';
 import 'cart_screen.dart' show confirm;
 import 'order_screens.dart' show SignInPrompt;
@@ -45,61 +46,68 @@ class AccountScreen extends ConsumerWidget {
           ref.invalidate(unreadMessagesProvider);
           await ref.read(authProvider.notifier).reload();
         },
-        child: ListView(padding: const EdgeInsets.all(12), children: [
-          SectionCard(
-            child: Row(children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: Brand.blue.withValues(alpha: 0.1),
-                backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
-                child: user.photoUrl == null ? Text(user.name.isEmpty ? '?' : user.name[0].toUpperCase(), style: const TextStyle(fontSize: 22, color: Brand.blue)) : null,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(user.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                  Row(children: [
-                    Text(user.phone),
-                    const SizedBox(width: 6),
-                    user.phoneVerified
-                        ? const Icon(Icons.verified, size: 16, color: Brand.success)
-                        : TextButton(onPressed: () => context.push('/verify-phone'), child: const Text('Verify')),
-                  ]),
+        // Padded content, then the website's footer edge to edge.
+        child: ListView(children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              SectionCard(
+                child: Row(children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Brand.blue.withValues(alpha: 0.1),
+                    backgroundImage: user.photoUrl != null ? NetworkImage(user.photoUrl!) : null,
+                    child: user.photoUrl == null ? Text(user.name.isEmpty ? '?' : user.name[0].toUpperCase(), style: const TextStyle(fontSize: 22, color: Brand.blue)) : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(user.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                      Row(children: [
+                        Text(user.phone),
+                        const SizedBox(width: 6),
+                        user.phoneVerified
+                            ? const Icon(Icons.verified, size: 16, color: Brand.success)
+                            : TextButton(onPressed: () => context.push('/verify-phone'), child: const Text('Verify')),
+                      ]),
+                    ]),
+                  ),
                 ]),
               ),
+              const SizedBox(height: 10),
+              Row(children: [
+                _Stat(label: 'Orders', value: '${orders['total'] ?? '–'}', onTap: () => context.push('/orders')),
+                const SizedBox(width: 8),
+                _Stat(label: 'Need action', value: '${orders['action_needed'] ?? '–'}', onTap: () => context.push('/orders')),
+                const SizedBox(width: 8),
+                _Stat(label: 'Balance', value: overview == null ? '–' : Money.bdt(str(overview['credit_balance_bdt'])), onTap: () => context.push('/account/credit')),
+              ]),
+              const SizedBox(height: 10),
+              Card(
+                child: Column(children: [
+                  _Item(Icons.receipt_long_outlined, 'My orders', '/orders'),
+                  _Item(Icons.chat_bubble_outline, 'Messages', '/chat', badge: unread),
+                  _Item(Icons.support_agent, 'Complaints & support', '/support'),
+                  _Item(Icons.account_balance_wallet_outlined, 'Payment history', '/account/payments'),
+                  _Item(Icons.savings_outlined, 'Account balance', '/account/credit'),
+                  _Item(Icons.location_on_outlined, 'Address book', '/account/addresses'),
+                  _Item(Icons.person_outline, 'Profile', '/account/profile'),
+                  _Item(Icons.lock_outline, 'Change password', '/account/password'),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  if (await confirm(context, 'Sign out?', 'Your cart stays with your account.')) {
+                    await ref.read(authProvider.notifier).signOut();
+                  }
+                },
+                icon: const Icon(Icons.logout),
+                label: const Text('Sign out'),
+              ),
             ]),
           ),
-          const SizedBox(height: 10),
-          Row(children: [
-            _Stat(label: 'Orders', value: '${orders['total'] ?? '–'}', onTap: () => context.push('/orders')),
-            const SizedBox(width: 8),
-            _Stat(label: 'Need action', value: '${orders['action_needed'] ?? '–'}', onTap: () => context.push('/orders')),
-            const SizedBox(width: 8),
-            _Stat(label: 'Balance', value: overview == null ? '–' : Money.bdt(str(overview['credit_balance_bdt'])), onTap: () => context.push('/account/credit')),
-          ]),
-          const SizedBox(height: 10),
-          Card(
-            child: Column(children: [
-              _Item(Icons.receipt_long_outlined, 'My orders', '/orders'),
-              _Item(Icons.chat_bubble_outline, 'Messages', '/chat', badge: unread),
-              _Item(Icons.support_agent, 'Complaints & support', '/support'),
-              _Item(Icons.account_balance_wallet_outlined, 'Payment history', '/account/payments'),
-              _Item(Icons.savings_outlined, 'Account balance', '/account/credit'),
-              _Item(Icons.location_on_outlined, 'Address book', '/account/addresses'),
-              _Item(Icons.person_outline, 'Profile', '/account/profile'),
-              _Item(Icons.lock_outline, 'Change password', '/account/password'),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () async {
-              if (await confirm(context, 'Sign out?', 'Your cart stays with your account.')) {
-                await ref.read(authProvider.notifier).signOut();
-              }
-            },
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
-          ),
+          const SiteFooter(),
         ]),
       ),
     );

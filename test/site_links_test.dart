@@ -1,3 +1,4 @@
+import 'package:easybuy/ui/app.dart' show pushRoute;
 import 'package:easybuy/ui/screens/article_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,5 +16,11 @@ void main() {
   test('other links stay with the browser', () {
     expect(appRouteFor('https://www.facebook.com/sharer/sharer.php?u=x'), isNull);
     expect(appRouteFor('https://easybuy.com.bd/account/orders'), isNull);
+  });
+
+  test('a broadcast notification opens its link in the app', () {
+    expect(pushRoute({'type': 'link', 'url': 'https://easybuy.com.bd/products/iron-wall-clock-722930'}), '/product/722930');
+    expect(pushRoute({'type': 'link', 'url': 'https://easybuy.com.bd/account/orders'}), isNull);
+    expect(pushRoute({'type': 'home'}), isNull);
   });
 }

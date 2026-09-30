@@ -378,7 +378,7 @@ class _OrderSummary extends StatelessWidget {
           const Expanded(child: Text('Total (selected goods)', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF4B5563)))),
           Text(Money.bdt(cart.selectedTotal), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Brand.orange)),
         ]),
-        DiscountRows(campaign: s?.campaign, coupon: cart.coupon, total: cart.selectedTotal, net: s?.netGoods),
+        DiscountRows(campaign: s?.campaign, coupon: cart.coupon, firstOrder: s?.firstOrder, total: cart.selectedTotal, net: s?.netGoods),
         const SizedBox(height: 14),
         _CouponBox(coupon: cart.coupon),
         if (s != null && s.hasAdvance) ...[
@@ -550,9 +550,12 @@ class DashedDivider extends StatelessWidget {
 /// The campaign and coupon rows and the after-discount total
 /// (partials/discount-summary).
 class DiscountRows extends StatelessWidget {
-  const DiscountRows({super.key, this.campaign, this.coupon, required this.total, this.net});
+  const DiscountRows({super.key, this.campaign, this.coupon, this.firstOrder, required this.total, this.net});
   final Json? campaign;
   final CouponState? coupon;
+
+  /// The first app order discount, when this customer gets it.
+  final Json? firstOrder;
   final String total;
   final String? net;
 
@@ -574,7 +577,11 @@ class DiscountRows extends StatelessWidget {
       if (c != null && c['applies'] != true && c['min_order_amount_bdt'] != null)
         band(const Color(0xFFFFFBEB), const Color(0xFF92400E),
             'Add ${Money.bdt('${(double.tryParse('${c['min_order_amount_bdt']}') ?? 0) - (double.tryParse(total) ?? 0)}')} more to unlock ${c['label']} (${c['title']}).'),
-      if (coupon != null && coupon!.isValid)
+      if (firstOrder != null)
+        band(const Color(0xFFEFF6FF), Brand.blue, '${firstOrder!['label']} — ${firstOrder!['off_label']}', '− ${Money.bdt('${firstOrder!['discount_bdt']}')}'),
+      // Set aside for the bigger first app order discount: kept, not used.
+      if (coupon != null && coupon!.superseded) band(const Color(0xFFF9FAFB), const Color(0xFF4B5563), 'Coupon ${coupon!.code}: ${coupon!.message ?? 'kept for your next order'}'),
+      if (coupon != null && coupon!.isValid && !coupon!.superseded)
         band(const Color(0xFFF0FDF4), const Color(0xFF15803D), 'Coupon ${coupon!.code}${coupon!.label != null ? ' — ${coupon!.label}' : ''}', '− ${Money.bdt(coupon!.discount)}'),
       if (coupon != null && !coupon!.isValid) band(const Color(0xFFFEF2F2), const Color(0xFFB91C1C), 'Coupon ${coupon!.code}: ${coupon!.message ?? 'not applied'}'),
       if (discounted)

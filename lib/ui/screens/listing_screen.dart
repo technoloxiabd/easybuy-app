@@ -8,6 +8,7 @@ import '../../core/theme.dart';
 import '../../data/models.dart';
 import '../../state/providers.dart';
 import '../widgets/common.dart';
+import '../widgets/footer.dart';
 import '../widgets/product_grid.dart';
 import '../widgets/site.dart';
 import '../widgets/tab_bar.dart';
@@ -46,6 +47,8 @@ class _ListingScreenState extends ConsumerState<ListingScreen> {
       bottomNavigationBar: id != null || widget.query != null ? const PageTabBar() : null,
       body: ProductGrid(
         listing: _listing,
+        // The website's catalogue pages end in its footer too.
+        footer: const SiteFooter(),
         onRefresh: () async {
           if (id != null) ref.invalidate(categoryInfoProvider(id));
           ref.invalidate(highlightsProvider(id));

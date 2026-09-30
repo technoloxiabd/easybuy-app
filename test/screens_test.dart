@@ -89,6 +89,14 @@ class ShotApi extends EasyBuyApi {
   @override
   Future<HomeData> home() async => live.home;
 
+  // The footer's company block: sample details (the API has no endpoint yet).
+  @override
+  Future<CompanyInfo> company() async => CompanyInfo(
+        name: 'Easy Buy', legalName: 'Easy Buy', tagline: 'Wholesale sourcing from China, delivered door-to-door in Bangladesh.',
+        address: 'House 00, Road 00, Gulshan, Dhaka 1212, Bangladesh', phone: '+880 1700-000000', email: 'support@easybuy.com.bd', hours: 'Sat–Thu, 10:00 AM – 7:00 PM',
+        social: const [('facebook', 'https://facebook.com'), ('youtube', 'https://youtube.com'), ('whatsapp', 'https://wa.me/8801700000000')],
+      );
+
   @override
   Future<CategoryInfo> category(int id) async => live.category;
 
@@ -362,6 +370,12 @@ void main() {
     await shot('02_home_videos');
     await scrollTo(1500);
     await shot('03_home_popular');
+    // The website's footer, at the end of the homepage.
+    for (var i = 0; i < 4; i++) {
+      await scrollTo(100000);
+    }
+    await shot('22_home_footer');
+    await scrollTo(0);
 
     router.go('/categories');
     await settle();

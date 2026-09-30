@@ -308,7 +308,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
             const Expanded(child: Text('Goods total', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
             Text(Money.bdt(c.goodsTotal), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Brand.orange)),
           ]),
-          DiscountRows(campaign: c.campaign, coupon: c.coupon, total: c.goodsTotal, net: c.netGoods),
+          DiscountRows(campaign: c.campaign, coupon: c.coupon, firstOrder: c.firstOrder, total: c.goodsTotal, net: c.netGoods),
           if (c.advancePercent != null || Money.isPositive(c.dueLater)) ...[
             const SizedBox(height: 12),
             AdvanceDue(now: c.dueNow, later: c.dueLater, percent: c.advancePercent, total: c.netGoods, discounted: c.netGoods != c.goodsTotal),

@@ -39,9 +39,12 @@ class ListingQuery {
 /// An endlessly scrolling grid of the website's product cards, with any
 /// header slivers above it. Fetches the next page near the end.
 class ProductGrid extends ConsumerStatefulWidget {
-  const ProductGrid({super.key, required this.listing, this.headers = const [], this.onRefresh});
+  const ProductGrid({super.key, required this.listing, this.headers = const [], this.footer, this.onRefresh});
   final ListingQuery listing;
   final List<Widget> headers;
+
+  /// Below the last product, once there are no more pages to fetch.
+  final Widget? footer;
   final Future<void> Function()? onRefresh;
 
   @override
@@ -127,6 +130,7 @@ class _ProductGridState extends ConsumerState<ProductGrid> {
               if (_loading) const SliverToBoxAdapter(child: LoadingView()),
               if (_items.isNotEmpty && _error != null && !_loading)
                 SliverToBoxAdapter(child: TextButton(onPressed: _load, child: const Text('Load more'))),
+              if (_done && widget.footer != null) SliverToBoxAdapter(child: widget.footer),
             ],
           ),
         ),

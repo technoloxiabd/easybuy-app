@@ -390,6 +390,43 @@ class HomeData {
   }
 }
 
+/// GET /company -- the shop's identity for the footer: what the website's
+/// footer reads from config('company.*'), which the admin edits under
+/// Settings › Company, so none of it is written into the app.
+class CompanyInfo {
+  CompanyInfo({required this.name, required this.legalName, required this.tagline, required this.address, required this.phone, required this.email, required this.hours, this.logoUrl, this.social = const []});
+  final String name;
+  final String legalName;
+  final String tagline;
+  final String address;
+  final String phone;
+  final String email;
+  final String hours;
+
+  /// The logo for a dark background (the website's logo_light, else
+  /// logo_dark); null prints the legal name instead, as the website does.
+  final String? logoUrl;
+
+  /// (network, link) for each profile set, in the website's order;
+  /// WhatsApp already a wa.me link.
+  final List<(String, String)> social;
+
+  factory CompanyInfo.fromJson(Json j) => CompanyInfo(
+        name: str(j['name']),
+        legalName: str(j['legal_name'] ?? j['name']),
+        tagline: str(j['tagline']),
+        address: str(j['address']),
+        phone: str(j['phone']),
+        email: str(j['email']),
+        hours: str(j['hours']),
+        logoUrl: strOrNull(j['logo_url']),
+        social: [
+          for (final e in obj(j['social']).entries)
+            if (e.value != null && '${e.value}'.isNotEmpty) (e.key, '${e.value}'),
+        ],
+      );
+}
+
 /// GET /categories/{id} -- a category page's header and chips.
 class CategoryInfo {
   CategoryInfo({required this.id, required this.name, this.parentId, this.parentName, required this.itemCount, required this.chips});
@@ -475,26 +512,35 @@ class CartItem {
 }
 
 class CouponState {
-  CouponState({required this.code, this.label, required this.isValid, this.message, this.discount});
+  CouponState({required this.code, this.label, required this.isValid, this.message, this.discount, this.superseded = false});
   final String code;
   final String? label;
   final bool isValid;
   final String? message;
   final String? discount;
+
+  /// Valid, but a bigger first app order discount applies instead; the
+  /// coupon is kept for another order ([message] says so).
+  final bool superseded;
   factory CouponState.fromJson(Json j) => CouponState(
         code: str(j['code']),
         label: strOrNull(j['label']),
         isValid: boolean(j['is_valid']),
         message: strOrNull(j['message']),
         discount: strOrNull(j['discount_bdt']),
+        superseded: boolean(j['superseded']),
       );
 }
 
 /// The website cart page's "Order summary" for the ticked lines.
 class CartSummary {
-  CartSummary({required this.selectedProducts, this.campaign, required this.netGoods, required this.hasAdvance, required this.dueNow, required this.dueLater, this.advancePercent});
+  CartSummary({required this.selectedProducts, this.campaign, this.firstOrder, required this.netGoods, required this.hasAdvance, required this.dueNow, required this.dueLater, this.advancePercent});
   final int selectedProducts;
   final Json? campaign;
+
+  /// The first app order discount {label, off_label, discount_bdt}, when
+  /// this customer gets it (owner, 30 Sep 2026).
+  final Json? firstOrder;
   final String netGoods;
   final bool hasAdvance;
   final String dueNow;
@@ -503,6 +549,7 @@ class CartSummary {
   factory CartSummary.fromJson(Json j) => CartSummary(
         selectedProducts: integer(j['selected_products']),
         campaign: objOrNull(j['campaign']),
+        firstOrder: objOrNull(j['first_order']),
         netGoods: str(j['net_goods_bdt'], '0.00'),
         hasAdvance: boolean(j['has_advance']),
         dueNow: str(j['due_now_bdt'], '0.00'),
@@ -586,7 +633,7 @@ class DeliveryMethod {
 }
 
 class Checkout {
-  Checkout({required this.lines, required this.itemCount, required this.goodsTotal, this.campaign, this.coupon, required this.netGoods, required this.dueNow, required this.dueLater, this.advancePercent, required this.creditBalance, this.shippingMethod, required this.shippingMethods, this.deliveryMethod, required this.deliveryChoiceRequired, required this.deliveryMethods, required this.addresses, this.defaultAddressId, this.addressRequired = true, this.termsTitle, this.termsHtml, required this.blockers, required this.canPlace, this.paymentMethods = const [], this.paymentMethodRequired = false});
+  Checkout({required this.lines, required this.itemCount, required this.goodsTotal, this.campaign, this.coupon, this.firstOrder, required this.netGoods, required this.dueNow, required this.dueLater, this.advancePercent, required this.creditBalance, this.shippingMethod, required this.shippingMethods, this.deliveryMethod, required this.deliveryChoiceRequired, required this.deliveryMethods, required this.addresses, this.defaultAddressId, this.addressRequired = true, this.termsTitle, this.termsHtml, required this.blockers, required this.canPlace, this.paymentMethods = const [], this.paymentMethodRequired = false});
 
   /// Chosen before placing, as on the website's checkout.
   final List<PayMethod> paymentMethods;
@@ -597,6 +644,9 @@ class Checkout {
   final String goodsTotal;
   final Json? campaign;
   final CouponState? coupon;
+
+  /// The first app order discount {label, off_label, discount_bdt}, or null.
+  final Json? firstOrder;
   final String netGoods;
   final String dueNow;
   final String dueLater;
@@ -627,6 +677,7 @@ class Checkout {
       goodsTotal: str(totals['goods_total_bdt'], '0.00'),
       campaign: objOrNull(totals['campaign']),
       coupon: objOrNull(totals['coupon']) == null ? null : CouponState.fromJson(obj(totals['coupon'])),
+      firstOrder: objOrNull(totals['first_order']),
       netGoods: str(totals['net_goods_bdt'], '0.00'),
       dueNow: str(payment['due_now_bdt'], '0.00'),
       dueLater: str(payment['due_later_bdt'], '0.00'),

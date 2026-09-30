@@ -81,6 +81,9 @@ class EasyBuyApi {
 
   Future<HomeData> home() async => HomeData.fromJson(obj((await client.get('/home'))['data']));
 
+  /// The footer's company details, contacts and social profiles.
+  Future<CompanyInfo> company() async => CompanyInfo.fromJson(obj((await client.get('/company'))['data']));
+
   Future<CategoryInfo> category(int id) async => CategoryInfo.fromJson(obj((await client.get('/categories/$id'))['data']));
 
   Future<List<Highlight>> highlights({int? category}) async => listOf(
