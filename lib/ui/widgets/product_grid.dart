@@ -8,13 +8,16 @@ import 'site.dart';
 
 /// What a listing asks for: the website's category/search/shop query.
 class ListingQuery {
-  const ListingQuery({this.query, this.category, this.sort, this.minPrice, this.maxPrice, this.factoryOnly = false});
+  const ListingQuery({this.query, this.category, this.sort, this.minPrice, this.maxPrice, this.factoryOnly = false, this.seller});
   final String? query;
   final int? category;
   final String? sort;
   final String? minPrice;
   final String? maxPrice;
   final bool factoryOnly;
+
+  /// One seller's store: their products, best sellers first.
+  final int? seller;
 
   ListingQuery copyWith({String? sort, String? minPrice, String? maxPrice, bool? factoryOnly, bool clearPrices = false}) => ListingQuery(
         query: query,
@@ -23,6 +26,7 @@ class ListingQuery {
         minPrice: clearPrices ? null : (minPrice ?? this.minPrice),
         maxPrice: clearPrices ? null : (maxPrice ?? this.maxPrice),
         factoryOnly: factoryOnly ?? this.factoryOnly,
+        seller: seller,
       );
 
   bool get hasFilters => (minPrice ?? '').isNotEmpty || (maxPrice ?? '').isNotEmpty || factoryOnly;
@@ -30,22 +34,25 @@ class ListingQuery {
   @override
   bool operator ==(Object other) =>
       other is ListingQuery && other.query == query && other.category == category && other.sort == sort &&
-      other.minPrice == minPrice && other.maxPrice == maxPrice && other.factoryOnly == factoryOnly;
+      other.minPrice == minPrice && other.maxPrice == maxPrice && other.factoryOnly == factoryOnly && other.seller == seller;
 
   @override
-  int get hashCode => Object.hash(query, category, sort, minPrice, maxPrice, factoryOnly);
+  int get hashCode => Object.hash(query, category, sort, minPrice, maxPrice, factoryOnly, seller);
 }
 
 /// An endlessly scrolling grid of the website's product cards, with any
 /// header slivers above it. Fetches the next page near the end.
 class ProductGrid extends ConsumerStatefulWidget {
-  const ProductGrid({super.key, required this.listing, this.headers = const [], this.footer, this.onRefresh});
+  const ProductGrid({super.key, required this.listing, this.headers = const [], this.footer, this.onRefresh, this.empty});
   final ListingQuery listing;
   final List<Widget> headers;
 
   /// Below the last product, once there are no more pages to fetch.
   final Widget? footer;
   final Future<void> Function()? onRefresh;
+
+  /// In place of "No products found" when there is nothing to list.
+  final Widget? empty;
 
   @override
   ConsumerState<ProductGrid> createState() => _ProductGridState();
@@ -85,10 +92,13 @@ class _ProductGridState extends ConsumerState<ProductGrid> {
     setState(() => _loading = true);
     final q = widget.listing;
     try {
-      final page = await ref.read(apiProvider).products(
-            query: q.query, category: q.category, sort: q.sort, cursor: _cursor,
-            minPrice: q.minPrice, maxPrice: q.maxPrice, factoryOnly: q.factoryOnly,
-          );
+      final api = ref.read(apiProvider);
+      final page = q.seller != null
+          ? await api.sellerProducts(q.seller!, cursor: _cursor)
+          : await api.products(
+              query: q.query, category: q.category, sort: q.sort, cursor: _cursor,
+              minPrice: q.minPrice, maxPrice: q.maxPrice, factoryOnly: q.factoryOnly,
+            );
       if (!mounted || q != widget.listing) return;
       setState(() {
         _items.addAll(page.items);
@@ -121,9 +131,9 @@ class _ProductGridState extends ConsumerState<ProductGrid> {
               if (_items.isEmpty && _error != null)
                 SliverFillRemaining(hasScrollBody: false, child: ErrorView(error: _error!, onRetry: _reset))
               else if (_items.isEmpty && _done)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
-                  child: EmptyState(icon: Icons.search_off_rounded, title: 'No products found', body: 'Try other words, or browse the categories.'),
+                  child: widget.empty ?? const EmptyState(icon: Icons.search_off_rounded, title: 'No products found', body: 'Try other words, or browse the categories.'),
                 )
               else
                 SliverPadding(padding: const EdgeInsets.fromLTRB(16, 4, 16, 16), sliver: ProductCardGrid(products: _items)),

@@ -21,6 +21,7 @@ import 'screens/home_screen.dart';
 import 'screens/image_search_screen.dart';
 import 'screens/listing_screen.dart';
 import 'screens/product_screen.dart';
+import 'screens/seller_screen.dart';
 import 'screens/checkout_screen.dart';
 import 'screens/order_screens.dart';
 import 'screens/pay_screen.dart';
@@ -28,6 +29,7 @@ import 'screens/support_screens.dart';
 import 'screens/videos_screen.dart';
 import 'widgets/chat_fab.dart';
 import 'widgets/tab_bar.dart';
+import 'widgets/update_prompt.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -72,6 +74,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/blog', parentNavigatorKey: _rootKey, builder: (_, s) => ArticleScreen(url: s.uri.queryParameters['url'] ?? '${AppConfig.siteBase}/blog')),
       GoRoute(path: '/category/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ListingScreen(categoryId: int.parse(s.pathParameters['id']!))),
       GoRoute(path: '/product/:id', parentNavigatorKey: _rootKey, builder: (_, s) => ProductScreen(id: int.parse(s.pathParameters['id']!), preview: s.extra is ProductCard ? s.extra as ProductCard : null)),
+      GoRoute(path: '/seller/:id', parentNavigatorKey: _rootKey, builder: (_, s) => SellerScreen(id: int.parse(s.pathParameters['id']!), preview: s.extra is Map<String, dynamic> ? s.extra as Map<String, dynamic> : null)),
       GoRoute(path: '/orders', parentNavigatorKey: _rootKey, builder: (_, _) => const OrdersScreen()),
       GoRoute(path: '/checkout', parentNavigatorKey: _rootKey, builder: (_, _) => const CheckoutScreen()),
       GoRoute(path: '/orders/:number', parentNavigatorKey: _rootKey, builder: (_, s) => OrderScreen(number: s.pathParameters['number']!)),
@@ -95,7 +98,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/chat',
         parentNavigatorKey: _rootKey,
-        builder: (_, s) => ChatScreen(orderNumber: s.uri.queryParameters['order'], productId: int.tryParse(s.uri.queryParameters['product'] ?? '')),
+        builder: (_, s) => ChatScreen(
+          orderNumber: s.uri.queryParameters['order'],
+          productId: int.tryParse(s.uri.queryParameters['product'] ?? ''),
+          shareProduct: s.uri.queryParameters['share'] == '1',
+        ),
       ),
     ],
   );
@@ -135,8 +142,11 @@ class EasyBuyApp extends ConsumerStatefulWidget {
   ConsumerState<EasyBuyApp> createState() => _EasyBuyAppState();
 }
 
-class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
+class _EasyBuyAppState extends ConsumerState<EasyBuyApp> with WidgetsBindingObserver {
   final _subs = <StreamSubscription<Object?>>[];
+
+  /// A newer build out: asked on start and on coming back to the front.
+  late final _update = UpdatePrompt(ref.read(apiProvider), () => ref.read(routerProvider).routerDelegate.navigatorKey.currentContext);
 
   @override
   void initState() {
@@ -156,10 +166,18 @@ class _EasyBuyAppState extends ConsumerState<EasyBuyApp> {
     // Open app: PushService puts it in the notification bar; bring the
     // Messages count up to date at once.
     _subs.add(push.foreground.listen((_) => ref.invalidate(unreadMessagesProvider)));
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _update.check());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _update.check();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final s in _subs) {
       s.cancel();
     }

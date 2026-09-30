@@ -22,6 +22,7 @@ String? appRouteFor(String url) {
   if (path.startsWith('/products/') && id != null) return '/product/$id';
   if (path.startsWith('/p/') && id != null) return '/product/$id';
   if (path.startsWith('/category/') && id != null) return '/category/$id';
+  if (path.startsWith('/seller/') && id != null) return '/seller/$id';
   if (path == '/products') {
     final q = uri.queryParameters['q'];
     return q == null || q.isEmpty ? '/shop' : '/search/results?q=${Uri.encodeComponent(q)}';

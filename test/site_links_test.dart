@@ -9,6 +9,7 @@ void main() {
     expect(appRouteFor('https://easybuy.com.bd/products/iron-wall-clock-722930'), '/product/722930');
     expect(appRouteFor('https://easybuy.com.bd/p/722930'), '/product/722930');
     expect(appRouteFor('https://easybuy.com.bd/category/womens-bags-787'), '/category/787');
+    expect(appRouteFor('https://easybuy.com.bd/seller/42'), '/seller/42');
     expect(appRouteFor('https://easybuy.com.bd/products?q=hoodie'), '/search/results?q=hoodie');
     expect(appRouteFor('https://easybuy.com.bd/products'), '/shop');
   });

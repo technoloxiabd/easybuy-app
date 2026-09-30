@@ -1176,8 +1176,29 @@ class _InfoTabsState extends ConsumerState<_InfoTabs> {
     final s = widget.product.seller;
     if (s == null) return const Text('No seller information for this product.', style: TextStyle(color: Brand.grayText));
     final type = s['is_super_factory'] == true ? 'Super factory' : (s['is_factory'] == true ? 'Factory' : s['biz_type']);
+    final id = int.tryParse('${s['id']}');
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Text('${s['name']}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+      if (s['biz_type'] != null)
+        Padding(padding: const EdgeInsets.only(top: 2), child: Text('${s['biz_type']}', style: const TextStyle(fontSize: 12.5, color: Brand.grayText))),
+      // The website's "Visit Store": the seller's page here in the app,
+      // everything of theirs in our catalogue.
+      if (id != null) ...[
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton.icon(
+            onPressed: () => context.push('/seller/$id', extra: s),
+            style: FilledButton.styleFrom(
+              backgroundColor: Brand.blue,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            icon: const Icon(Icons.storefront_outlined, size: 18),
+            label: const Text('Visit Store', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ],
       const SizedBox(height: 12),
       _table([
         Attribute("Seller's total sales", compactCount(int.tryParse('${s['total_sales']}') ?? 0)),

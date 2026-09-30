@@ -177,9 +177,13 @@ class _ComplaintScreenState extends ConsumerState<ComplaintScreen> {
 // ------------------------------------------------------------------ chat
 
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key, this.orderNumber, this.productId});
+  const ChatScreen({super.key, this.orderNumber, this.productId, this.shareProduct = false});
   final String? orderNumber;
   final int? productId;
+
+  /// Send [productId]'s card as soon as the chat opens: the customer said
+  /// yes to "Chat about this product?" on its page.
+  final bool shareProduct;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -265,6 +269,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         _error = null;
       });
       ref.invalidate(unreadMessagesProvider);
+      if (widget.shareProduct && _aboutProduct != null) {
+        _loading = false;
+        _send(shareProduct: true).ignore();
+      }
     } catch (e) {
       setState(() => _error = e);
     } finally {

@@ -48,6 +48,21 @@ class EasyBuyApi {
     return Paged(listOf(r['data'], ProductCard.fromJson), strOrNull(obj(r['meta'])['next_cursor']));
   }
 
+  /// A seller's store (the website's /seller/{id}): who they are, and
+  /// `stocking` while their catalogue is still being brought in.
+  Future<Json> seller(int id) async => obj((await client.get('/sellers/$id'))['data']);
+
+  /// The seller's products, best sellers first, as on their store page.
+  Future<Paged<ProductCard>> sellerProducts(int id, {String? cursor}) async {
+    final r = await client.get('/sellers/$id/products', query: {'cursor': cursor, 'per_page': 20});
+    return Paged(listOf(r['data'], ProductCard.fromJson), strOrNull(obj(r['meta'])['next_cursor']));
+  }
+
+  /// Whether a newer build of the app is out ([build] is this one's), and
+  /// whether it must be installed before carrying on.
+  Future<Json> appVersion(String platform, int build) async =>
+      obj((await client.get('/app/version', query: {'platform': platform, 'build': build}))['data']);
+
   Future<ProductDetail> product(int id) async => ProductDetail.fromJson(obj((await client.get('/products/$id'))['data']));
 
   /// The product page's "Related products": the website's same eight.

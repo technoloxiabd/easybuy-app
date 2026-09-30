@@ -49,6 +49,18 @@ class FakeApi extends EasyBuyApi {
   Future<Cart> cart({bool visit = false}) async => Cart.empty();
 
   @override
+  Future<Map<String, dynamic>> seller(int id) async => {
+        'id': id, 'name': 'Yiwu Toys Factory', 'biz_type': null, 'location': 'Zhejiang', 'is_factory': true,
+        'is_super_factory': false, 'years': 6, 'rating': '4.8', 'total_sales': 12500, 'products': 2, 'stocking': false,
+      };
+
+  @override
+  Future<Paged<ProductCard>> sellerProducts(int id, {String? cursor}) async => Paged(_products, null);
+
+  @override
+  Future<Map<String, dynamic>> appVersion(String platform, int build) async => {'update_available': false};
+
+  @override
   Future<CompanyInfo> company() async => CompanyInfo(
         name: 'Easy Buy', legalName: 'Easy Buy Ltd', tagline: 'Wholesale from China, delivered to your door.',
         address: 'House 1, Road 2, Dhaka', phone: '+880 1700-000000', email: 'support@example.com', hours: 'Sat–Thu, 10 AM – 7 PM',
@@ -183,5 +195,20 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pumpAndSettle();
     expect(find.text('Welcome back'), findsOneWidget);
+  });
+
+  testWidgets("a seller's store: who they are, then their products", (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(tester.element(find.byType(EasyBuyApp)));
+    container.read(routerProvider).push('/seller/7');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Yiwu Toys Factory'), findsOneWidget);
+    expect(find.text('Level'), findsOneWidget);
+    expect(find.text('6 yrs'), findsOneWidget);
+    expect(find.text('12,500'), findsOneWidget);
+    expect(find.text('Zhejiang'), findsOneWidget);
+    expect(find.text('Stainless steel water bottle'), findsOneWidget);
   });
 }
