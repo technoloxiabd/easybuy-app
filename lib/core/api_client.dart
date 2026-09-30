@@ -1,4 +1,7 @@
+import 'dart:io' show Platform;
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'api_error.dart';
 import 'config.dart';
@@ -28,6 +31,9 @@ class ApiClient {
         if (token != null) options.headers['Authorization'] = 'Bearer $token';
         final cart = session.cartToken;
         if (cart != null) options.headers['X-Cart-Token'] = cart;
+        // Which app placed an order: the admin's order list shows Android
+        // or iOS (owner, 30 Sep 2026).
+        if (!kIsWeb) options.headers['X-App-Platform'] = Platform.isIOS ? 'ios' : 'android';
         handler.next(options);
       },
       onResponse: (response, handler) async {
