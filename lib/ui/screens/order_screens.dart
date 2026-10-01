@@ -446,17 +446,42 @@ class _ItemGroup extends StatelessWidget {
         if (ship != null)
           Padding(
             padding: const EdgeInsets.only(left: 54, top: 4),
-            child: Text(
-              [
-                'Shipping',
-                if (ship['rate_per_kg_bdt'] != null) '${Money.bdt(str(ship['rate_per_kg_bdt']))}/kg',
-                if (ship['weight_kg'] != null) '${ship['weight_kg']} kg',
-                if (ship['cost_bdt'] != null) '= ${Money.bdt(str(ship['cost_bdt']))}',
-              ].join(' · '),
-              style: const TextStyle(fontSize: 12, color: Brand.blue),
-            ),
+            child: Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              // The way it travels (owner, 1 Oct 2026), coloured as on the website.
+              if (ship['route_label'] != null) _RouteTag(route: str(ship['route']), label: str(ship['route_label'])),
+              Text(
+                [
+                  'Shipping',
+                  if (ship['rate_per_kg_bdt'] != null) '${Money.bdt(str(ship['rate_per_kg_bdt']))}/kg',
+                  if (ship['weight_kg'] != null) '${ship['weight_kg']} kg',
+                  if (ship['cost_bdt'] != null) '= ${Money.bdt(str(ship['cost_bdt']))}',
+                ].join(' · '),
+                style: const TextStyle(fontSize: 12, color: Brand.blue),
+              ),
+            ]),
           ),
       ]),
+    );
+  }
+}
+
+/// China, Hong Kong or Sea: the website's route tag colours.
+class _RouteTag extends StatelessWidget {
+  const _RouteTag({required this.route, required this.label});
+  final String route;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final (bg, fg) = switch (route) {
+      'china' => (const Color(0xFFFEE2E2), const Color(0xFFB91C1C)),
+      'hong_kong' => (const Color(0xFFEDE9FE), const Color(0xFF6D28D9)),
+      _ => (const Color(0xFFDBEAFE), const Color(0xFF1D4ED8)),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+      child: Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: fg)),
     );
   }
 }
