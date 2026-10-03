@@ -324,7 +324,7 @@ class StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = switch (status) {
       'delivered' => Brand.success,
-      'cancelled' || 'refunded' || 'rejected' => Brand.danger,
+      'cancelled' || 'refunded' || 'rejected' || 'returned_by_courier' => Brand.danger,
       'pending_payment' || 'pending' || 'ready_for_delivery' => Brand.warning,
       _ => Brand.blue,
     };
